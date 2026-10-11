@@ -1,18 +1,23 @@
 # NexPill
 
+NexPill is a smart medication management platform for patients and caregivers.
+It is designed to support medication schedules, dose tracking, reminders,
+caregiver access, safety checks, and adherence insights.
+
 ## Backend
 
-Install dependencies with `npm install`, copy `.env.example` to `.env`, and add
-the Supabase connection strings and public project settings before running the
-server or Prisma commands.
+The backend uses Node.js, TypeScript, Express, Prisma, and Supabase PostgreSQL.
+Supabase Auth provides the authentication foundation.
 
-- `npm run dev` starts the development server.
-- `npm run build` compiles TypeScript to `dist`.
-- `npm start` runs the compiled server.
-- `npm run lint` checks the source.
-- `GET /health` returns `{ "status": "ok" }`.
-- `GET /auth/me` verifies a Supabase bearer token and returns the authenticated
-  user's basic identity.
+```bash
+npm install
+cp .env.example .env
+npm run dev
+```
 
-The Prisma schema and initial migration contain the database foundation. Feature
-authorization and application workflows are not implemented yet.
+The API currently provides:
+
+- `GET /health`
+- `GET /auth/me` for Supabase bearer-token verification
+
+Application features are being developed incrementally.
