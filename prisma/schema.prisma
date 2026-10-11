@@ -7,3 +7,509 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
+
+
+enum PlatformRole {
+  USER
+  ADMIN
+}
+
+enum AccessStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
+enum MedicationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DoseStatus {
+  PENDING
+  TAKEN
+  SKIPPED
+  UNABLE_TO_TAKE
+  MISSED
+  CANCELLED
+}
+
+enum DoseEventSource {
+  PATIENT
+  CAREGIVER
+  DEVICE
+  SYSTEM
+}
+
+enum WarningKind {
+  INTERACTION
+  DUPLICATE
+  DOSE_LIMIT
+}
+
+enum Severity {
+  INFO
+  MODERATE
+  SEVERE
+}
+
+enum NotificationKind {
+  DOSE_REMINDER
+  DOSE_REMINDER_FOLLOWUP
+  CAREGIVER_ALERT
+  SAFETY_WARNING
+  DAILY_SUMMARY
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  EMAIL
+  SMS
+}
+
+enum NotificationStatus {
+  SCHEDULED
+  SENDING
+  SENT
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+enum AlertType {
+  DOSE_LATE
+  DOSE_MISSED
+  REPEATED_MISSES
+  RISK_HIGH
+  SAFETY_WARNING
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum RiskLevel {
+  STABLE
+  NEEDS_ATTENTION
+  HIGH_RISK
+}
+
+enum AnalysisKind {
+  RISK_ASSESSMENT
+  DAILY_SUMMARY
+  REMINDER_TIMING_SUGGESTION
+}
+
+enum AnalysisGenerator {
+  RULES
+  AI_MODEL
+}
+
+enum DeviceStatus {
+  UNASSIGNED
+  ACTIVE
+  RETIRED
+}
+
+enum DeviceEventType {
+  COMPARTMENT_OPENED
+  DOSE_DISPENSED
+  DOSE_REMOVED
+  HEARTBEAT
+  ERROR
+}
+
+enum ActorType {
+  USER
+  SYSTEM_JOB
+  AI_SERVICE
+}
+
+
+model User {
+  id           String       @id @db.Uuid
+  email        String       @unique
+  platformRole PlatformRole @default(USER)
+  disabledAt   DateTime?    @db.Timestamptz(6)
+  createdAt    DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @db.Timestamptz(6)
+
+  profile   UserProfile?
+  endpoints NotificationEndpoint[]
+
+  asPatientAccess   CaregiverAccess[] @relation("AccessPatient")
+  asCaregiverAccess CaregiverAccess[] @relation("AccessCaregiver")
+  requestedAccess   CaregiverAccess[] @relation("AccessRequestedBy")
+
+  medications    Medication[]
+  doses          ScheduledDose[]
+  doseEvents     DoseEvent[]
+  notifications  Notification[]
+  alertsAbout    CaregiverAlert[]  @relation("AlertPatient")
+  alertsReceived CaregiverAlert[]  @relation("AlertRecipient")
+  analyses       AdherenceAnalysis[]
+  devices        Device[]
+  warnings       SafetyWarning[]   @relation("WarningPatient")
+  auditActed     AuditEvent[]
+}
+
+model UserProfile {
+  userId      String   @id @db.Uuid
+  displayName String
+  timeZone    String   @default("UTC")
+  locale      String   @default("en")
+  largeText   Boolean  @default(false)
+  highContrast Boolean @default(false)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationEndpoint {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String              @db.Uuid
+  channel   NotificationChannel
+  address   String
+  enabled   Boolean             @default(true)
+  createdAt DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime            @updatedAt @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel, address])
+  @@index([userId])
+}
+
+
+model CaregiverAccess {
+  id          String       @id @default(uuid()) @db.Uuid
+  caregiverId String       @db.Uuid
+  patientId   String       @db.Uuid
+  status      AccessStatus @default(PENDING)
+
+  canViewSchedule    Boolean @default(true)
+  canViewHistory     Boolean @default(true)
+  canReceiveAlerts   Boolean @default(true)
+  canRecordDoses     Boolean @default(false)
+  canManageMedications Boolean @default(false)
+
+  requestedById   String    @db.Uuid
+  inviteTokenHash String?   @unique
+  inviteExpiresAt DateTime? @db.Timestamptz(6)
+  grantedAt       DateTime? @db.Timestamptz(6)
+  revokedAt       DateTime? @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(6)
+
+  caregiver   User @relation("AccessCaregiver", fields: [caregiverId], references: [id], onDelete: Cascade)
+  patient     User @relation("AccessPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  requestedBy User @relation("AccessRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@unique([caregiverId, patientId])
+  @@index([patientId, status])
+  @@index([caregiverId, status])
+}
+
+
+model DrugCatalogItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  genericName String?
+  externalId  String?
+  source      String
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  medications  Medication[]
+  interactionsA DrugInteraction[] @relation("InteractionA")
+  interactionsB DrugInteraction[] @relation("InteractionB")
+
+  @@unique([source, externalId])
+  @@index([name])
+}
+
+model DrugInteraction {
+  id          String   @id @default(uuid()) @db.Uuid
+  drugAId     String   @db.Uuid
+  drugBId     String   @db.Uuid
+  severity    Severity
+  description String
+  source      String
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  drugA    DrugCatalogItem @relation("InteractionA", fields: [drugAId], references: [id], onDelete: Cascade)
+  drugB    DrugCatalogItem @relation("InteractionB", fields: [drugBId], references: [id], onDelete: Cascade)
+  warnings SafetyWarning[]
+
+  @@unique([drugAId, drugBId])
+  @@index([drugBId])
+}
+
+model SafetyWarning {
+  id                     String      @id @default(uuid()) @db.Uuid
+  patientId              String      @db.Uuid
+  medicationId           String      @db.Uuid
+  otherMedicationId      String?     @db.Uuid
+  interactionId          String?     @db.Uuid
+  kind                   WarningKind
+  severity               Severity
+  message                String
+  acknowledgedAt         DateTime?   @db.Timestamptz(6)
+  acknowledgedById       String?     @db.Uuid
+  createdAt              DateTime    @default(now()) @db.Timestamptz(6)
+
+  patient     User             @relation("WarningPatient", fields: [patientId], references: [id], onDelete: Restrict)
+  medication  Medication       @relation("WarningMedication", fields: [medicationId], references: [id], onDelete: Restrict)
+  other       Medication?      @relation("WarningOther", fields: [otherMedicationId], references: [id], onDelete: Restrict)
+  interaction DrugInteraction? @relation(fields: [interactionId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, createdAt])
+  @@index([medicationId])
+  @@index([otherMedicationId])
+}
+
+
+model Medication {
+  id             String           @id @default(uuid()) @db.Uuid
+  patientId      String           @db.Uuid
+  catalogItemId  String?          @db.Uuid
+  name           String
+  dosageText     String
+  form           String?
+  route          String?
+  instructions   String?
+  prescriber     String?
+  startDate      DateTime?        @db.Date
+  endDate        DateTime?        @db.Date
+  status         MedicationStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(6)
+
+  patient     User             @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  catalogItem DrugCatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
+  schedules   MedicationSchedule[]
+  warnings    SafetyWarning[]  @relation("WarningMedication")
+  warningsAsOther SafetyWarning[] @relation("WarningOther")
+
+  @@index([patientId, status])
+}
+
+model MedicationSchedule {
+  id                 String    @id @default(uuid()) @db.Uuid
+  medicationId       String    @db.Uuid
+  previousScheduleId String?   @unique @db.Uuid
+  doseLabel          String
+  timeZone           String
+  timesOfDay         String[]
+  daysOfWeek         Int[]
+  startDate          DateTime  @db.Date
+  endDate            DateTime? @db.Date
+  effectiveFrom      DateTime  @default(now()) @db.Timestamptz(6)
+  effectiveTo        DateTime? @db.Timestamptz(6)
+  generatedThrough   DateTime? @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(6)
+
+  medication Medication         @relation(fields: [medicationId], references: [id], onDelete: Restrict)
+  previous   MedicationSchedule? @relation("ScheduleVersion", fields: [previousScheduleId], references: [id], onDelete: Restrict)
+  next       MedicationSchedule? @relation("ScheduleVersion")
+  reminder   ReminderConfig?
+  doses      ScheduledDose[]
+
+  @@index([medicationId, effectiveTo])
+  @@index([effectiveTo, generatedThrough])
+}
+
+model ReminderConfig {
+  id                    String   @id @default(uuid()) @db.Uuid
+  scheduleId            String   @unique @db.Uuid
+  reminderOffsetsMin    Int[]    @default([0, 15])
+  lateAfterMin          Int      @default(15)
+  caregiverAlertAfterMin Int     @default(30)
+  missedAfterMin        Int      @default(120)
+  notifyCaregivers      Boolean  @default(true)
+  createdAt             DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(6)
+
+  schedule MedicationSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+}
+
+
+model ScheduledDose {
+  id               String     @id @default(uuid()) @db.Uuid
+  scheduleId       String     @db.Uuid
+  patientId        String     @db.Uuid
+  scheduledAt      DateTime   @db.Timestamptz(6)
+  localDate        DateTime   @db.Date
+  timeZone         String
+  lateAfterAt      DateTime   @db.Timestamptz(6)
+  missedDeadlineAt DateTime   @db.Timestamptz(6)
+  status           DoseStatus @default(PENDING)
+  version          Int        @default(0)
+  resolvedAt       DateTime?  @db.Timestamptz(6)
+  resolvedSource   DoseEventSource?
+  createdAt        DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime   @updatedAt @db.Timestamptz(6)
+
+  schedule      MedicationSchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  patient       User               @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  events        DoseEvent[]
+  notifications Notification[]
+  alerts        CaregiverAlert[]
+  deviceEvents  DeviceEvent[]
+
+  @@unique([scheduleId, scheduledAt])
+  @@index([patientId, scheduledAt])
+  @@index([patientId, localDate])
+  @@index([status, missedDeadlineAt])
+}
+
+model DoseEvent {
+  id             String          @id @default(uuid()) @db.Uuid
+  doseId         String          @db.Uuid
+  fromStatus     DoseStatus
+  toStatus       DoseStatus
+  source         DoseEventSource
+  actorUserId    String?         @db.Uuid
+  deviceEventId  String?         @unique @db.Uuid
+  occurredAt     DateTime        @db.Timestamptz(6)
+  recordedAt     DateTime        @default(now()) @db.Timestamptz(6)
+  idempotencyKey String          @unique
+  note           String?
+
+  dose        ScheduledDose @relation(fields: [doseId], references: [id], onDelete: Restrict)
+  actor       User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  deviceEvent DeviceEvent?  @relation(fields: [deviceEventId], references: [id], onDelete: SetNull)
+
+  @@index([doseId, recordedAt])
+  @@index([actorUserId])
+}
+
+
+model Notification {
+  id            String              @id @default(uuid()) @db.Uuid
+  recipientId   String              @db.Uuid
+  patientId     String              @db.Uuid
+  doseId        String?             @db.Uuid
+  alertId       String?             @db.Uuid
+  kind          NotificationKind
+  channel       NotificationChannel
+  status        NotificationStatus  @default(SCHEDULED)
+  scheduledFor  DateTime            @db.Timestamptz(6)
+  sentAt        DateTime?           @db.Timestamptz(6)
+  deliveredAt   DateTime?           @db.Timestamptz(6)
+  attemptCount  Int                 @default(0)
+  nextRetryAt   DateTime?           @db.Timestamptz(6)
+  lastError     String?
+  dedupeKey     String              @unique
+  createdAt     DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime            @updatedAt @db.Timestamptz(6)
+
+  recipient User            @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  dose      ScheduledDose?  @relation(fields: [doseId], references: [id], onDelete: SetNull)
+  alert     CaregiverAlert? @relation(fields: [alertId], references: [id], onDelete: SetNull)
+
+  @@index([status, scheduledFor])
+  @@index([recipientId, createdAt])
+  @@index([doseId])
+}
+
+model CaregiverAlert {
+  id             String      @id @default(uuid()) @db.Uuid
+  patientId      String      @db.Uuid
+  recipientId    String      @db.Uuid
+  doseId         String?     @db.Uuid
+  type           AlertType
+  status         AlertStatus @default(OPEN)
+  message        String
+  reason         Json
+  dedupeKey      String      @unique
+  createdAt      DateTime    @default(now()) @db.Timestamptz(6)
+  acknowledgedAt DateTime?   @db.Timestamptz(6)
+  resolvedAt     DateTime?   @db.Timestamptz(6)
+
+  patient       User           @relation("AlertPatient", fields: [patientId], references: [id], onDelete: Restrict)
+  recipient     User           @relation("AlertRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  dose          ScheduledDose? @relation(fields: [doseId], references: [id], onDelete: SetNull)
+  notifications Notification[]
+
+  @@index([recipientId, status, createdAt])
+  @@index([patientId, createdAt])
+}
+
+
+model AdherenceAnalysis {
+  id            String            @id @default(uuid()) @db.Uuid
+  patientId     String            @db.Uuid
+  kind          AnalysisKind
+  periodStart   DateTime          @db.Timestamptz(6)
+  periodEnd     DateTime          @db.Timestamptz(6)
+  riskLevel     RiskLevel?
+  metrics       Json
+  reasons       Json?
+  summaryText   String?
+  generator     AnalysisGenerator
+  modelName     String?
+  promptVersion String?
+  createdAt     DateTime          @default(now()) @db.Timestamptz(6)
+
+  patient User @relation(fields: [patientId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, kind, createdAt])
+}
+
+
+model Device {
+  id          String       @id @default(uuid()) @db.Uuid
+  serial      String       @unique
+  patientId   String?      @db.Uuid
+  status      DeviceStatus @default(UNASSIGNED)
+  isSimulated Boolean      @default(true)
+  lastSeenAt  DateTime?    @db.Timestamptz(6)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(6)
+
+  patient User?         @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  events  DeviceEvent[]
+
+  @@index([patientId])
+}
+
+model DeviceEvent {
+  id         String          @id @default(uuid()) @db.Uuid
+  deviceId   String          @db.Uuid
+  doseId     String?         @db.Uuid
+  type       DeviceEventType
+  occurredAt DateTime        @db.Timestamptz(6)
+  receivedAt DateTime        @default(now()) @db.Timestamptz(6)
+  payload    Json?
+
+  device    Device         @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  dose      ScheduledDose? @relation(fields: [doseId], references: [id], onDelete: SetNull)
+  doseEvent DoseEvent?
+
+  @@index([deviceId, occurredAt])
+  @@index([doseId])
+}
+
+
+model AuditEvent {
+  id           String    @id @default(uuid()) @db.Uuid
+  actorType    ActorType
+  actorId      String?   @db.Uuid
+  patientId    String?   @db.Uuid
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([resourceType, resourceId])
+}
