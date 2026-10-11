@@ -13,3 +13,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/settings.json
+
+# Internal documentation requested to be gitignored
+BACKEND_DEV_GUIDE.md
