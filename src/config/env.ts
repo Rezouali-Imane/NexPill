@@ -8,6 +8,10 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 
 export const env = {
   port,
+  host: process.env.HOST ?? "0.0.0.0",
+  nodeEnv: process.env.NODE_ENV ?? "development",
+  corsOrigin: process.env.CORS_ORIGIN ?? "*",
   supabaseUrl: process.env.SUPABASE_URL,
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
 } as const;
+
