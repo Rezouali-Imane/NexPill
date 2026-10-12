@@ -20,10 +20,13 @@ const gracefulShutdown = (signal: string) => {
   });
 
   // Force close if graceful shutdown takes longer than 10 seconds
-  setTimeout(() => {
+  const timer = setTimeout(() => {
     console.error("Graceful shutdown timeout exceeded. Forcefully exiting.");
     process.exit(1);
-  }, 10000).unref();
+  }, 10000);
+  if (typeof timer === "object" && timer !== null && "unref" in timer) {
+    (timer as NodeJS.Timeout).unref();
+  }
 };
 
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
