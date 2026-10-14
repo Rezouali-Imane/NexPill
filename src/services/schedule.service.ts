@@ -7,6 +7,9 @@ import {
   validateDaysOfWeek,
   parseDate,
   parseOptionalDate,
+  validateNonNegativeInteger,
+  validateBoolean,
+  validateReminderOffsets,
 } from "../utils/validation";
 import { AccessControlService } from "./access-control.service";
 import type { MedicationSchedule, Prisma } from "@prisma/client";
@@ -40,6 +43,40 @@ export interface UpdateScheduleDto {
 }
 
 export class ScheduleService {
+  private static validateReminder(reminder?: ReminderConfigDto) {
+    if (!reminder) {
+      return undefined;
+    }
+
+    return {
+      ...(reminder.reminderOffsetsMin !== undefined
+        ? { reminderOffsetsMin: validateReminderOffsets(reminder.reminderOffsetsMin) }
+        : {}),
+      ...(reminder.lateAfterMin !== undefined
+        ? { lateAfterMin: validateNonNegativeInteger(reminder.lateAfterMin, "lateAfterMin") }
+        : {}),
+      ...(reminder.caregiverAlertAfterMin !== undefined
+        ? {
+            caregiverAlertAfterMin: validateNonNegativeInteger(
+              reminder.caregiverAlertAfterMin,
+              "caregiverAlertAfterMin",
+            ),
+          }
+        : {}),
+      ...(reminder.missedAfterMin !== undefined
+        ? { missedAfterMin: validateNonNegativeInteger(reminder.missedAfterMin, "missedAfterMin") }
+        : {}),
+      ...(reminder.notifyCaregivers !== undefined
+        ? {
+            notifyCaregivers: validateBoolean(
+              reminder.notifyCaregivers,
+              "notifyCaregivers",
+            ),
+          }
+        : {}),
+    };
+  }
+
   /**
    * Creates a schedule and associated reminder configuration for a medication.
    */
@@ -67,6 +104,7 @@ export class ScheduleService {
     const daysOfWeek = validateDaysOfWeek(dto.daysOfWeek);
     const startDate = parseDate(dto.startDate, "startDate");
     const endDate = parseOptionalDate(dto.endDate, "endDate");
+    const reminder = ScheduleService.validateReminder(dto.reminder);
 
     if (endDate && startDate > endDate) {
       throw new BadRequestError("startDate cannot be later than endDate.");
@@ -83,11 +121,11 @@ export class ScheduleService {
         endDate: endDate ?? null,
         reminder: {
           create: {
-            reminderOffsetsMin: dto.reminder?.reminderOffsetsMin ?? [0, 15],
-            lateAfterMin: dto.reminder?.lateAfterMin ?? 15,
-            caregiverAlertAfterMin: dto.reminder?.caregiverAlertAfterMin ?? 30,
-            missedAfterMin: dto.reminder?.missedAfterMin ?? 120,
-            notifyCaregivers: dto.reminder?.notifyCaregivers ?? true,
+            reminderOffsetsMin: reminder?.reminderOffsetsMin ?? [0, 15],
+            lateAfterMin: reminder?.lateAfterMin ?? 15,
+            caregiverAlertAfterMin: reminder?.caregiverAlertAfterMin ?? 30,
+            missedAfterMin: reminder?.missedAfterMin ?? 120,
+            notifyCaregivers: reminder?.notifyCaregivers ?? true,
           },
         },
       },
@@ -189,6 +227,7 @@ export class ScheduleService {
     );
 
     const updateData: Prisma.MedicationScheduleUpdateInput = {};
+    const reminder = ScheduleService.validateReminder(dto.reminder);
 
     if (dto.doseLabel !== undefined) {
       updateData.doseLabel = validateNonEmptyString(dto.doseLabel, "doseLabel");
@@ -209,22 +248,45 @@ export class ScheduleService {
       updateData.endDate = parseOptionalDate(dto.endDate, "endDate") ?? null;
     }
 
-    if (dto.reminder) {
+    const finalStartDate =
+      updateData.startDate !== undefined
+        ? (updateData.startDate as Date)
+        : existing.startDate;
+    const finalEndDate =
+      updateData.endDate !== undefined
+        ? (updateData.endDate as Date | null)
+        : existing.endDate;
+
+    if (finalEndDate && finalStartDate > finalEndDate) {
+      throw new BadRequestError("startDate cannot be later than endDate.");
+    }
+
+    if (reminder) {
       updateData.reminder = {
         upsert: {
           create: {
-            reminderOffsetsMin: dto.reminder.reminderOffsetsMin ?? [0, 15],
-            lateAfterMin: dto.reminder.lateAfterMin ?? 15,
-            caregiverAlertAfterMin: dto.reminder.caregiverAlertAfterMin ?? 30,
-            missedAfterMin: dto.reminder.missedAfterMin ?? 120,
-            notifyCaregivers: dto.reminder.notifyCaregivers ?? true,
+            reminderOffsetsMin: reminder.reminderOffsetsMin ?? [0, 15],
+            lateAfterMin: reminder.lateAfterMin ?? 15,
+            caregiverAlertAfterMin: reminder.caregiverAlertAfterMin ?? 30,
+            missedAfterMin: reminder.missedAfterMin ?? 120,
+            notifyCaregivers: reminder.notifyCaregivers ?? true,
           },
           update: {
-            ...(dto.reminder.reminderOffsetsMin ? { reminderOffsetsMin: dto.reminder.reminderOffsetsMin } : {}),
-            ...(dto.reminder.lateAfterMin !== undefined ? { lateAfterMin: dto.reminder.lateAfterMin } : {}),
-            ...(dto.reminder.caregiverAlertAfterMin !== undefined ? { caregiverAlertAfterMin: dto.reminder.caregiverAlertAfterMin } : {}),
-            ...(dto.reminder.missedAfterMin !== undefined ? { missedAfterMin: dto.reminder.missedAfterMin } : {}),
-            ...(dto.reminder.notifyCaregivers !== undefined ? { notifyCaregivers: dto.reminder.notifyCaregivers } : {}),
+            ...(reminder.reminderOffsetsMin !== undefined
+              ? { reminderOffsetsMin: reminder.reminderOffsetsMin }
+              : {}),
+            ...(reminder.lateAfterMin !== undefined
+              ? { lateAfterMin: reminder.lateAfterMin }
+              : {}),
+            ...(reminder.caregiverAlertAfterMin !== undefined
+              ? { caregiverAlertAfterMin: reminder.caregiverAlertAfterMin }
+              : {}),
+            ...(reminder.missedAfterMin !== undefined
+              ? { missedAfterMin: reminder.missedAfterMin }
+              : {}),
+            ...(reminder.notifyCaregivers !== undefined
+              ? { notifyCaregivers: reminder.notifyCaregivers }
+              : {}),
           },
         },
       };

@@ -98,10 +98,42 @@ export function validateDaysOfWeek(days: unknown): number[] {
   return Array.from(uniqueDays).sort((a, b) => a - b);
 }
 
+export function validateNonNegativeInteger(
+  value: unknown,
+  fieldName: string,
+): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 0
+  ) {
+    throw new BadRequestError(`${fieldName} must be a non-negative integer.`);
+  }
+  return value;
+}
+
+export function validateBoolean(value: unknown, fieldName: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new BadRequestError(`${fieldName} must be a boolean.`);
+  }
+  return value;
+}
+
+export function validateReminderOffsets(value: unknown): number[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new BadRequestError(
+      "reminderOffsetsMin must be a non-empty array of non-negative integers.",
+    );
+  }
+
+  return value.map((offset) =>
+    validateNonNegativeInteger(offset, "reminderOffsetsMin"),
+  );
+}
+
 export function getParamString(param: string | string[] | undefined): string {
   if (Array.isArray(param)) {
     return param[0] ?? "";
   }
   return param ?? "";
 }
-
