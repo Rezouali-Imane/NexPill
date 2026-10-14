@@ -60,6 +60,10 @@ describe("Medication Endpoints", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.user.findUnique.mockResolvedValue({
+      platformRole: "USER",
+      disabledAt: null,
+    });
   });
 
   const authenticateAs = (userId: string, email = "user@nexpill.test") => {
