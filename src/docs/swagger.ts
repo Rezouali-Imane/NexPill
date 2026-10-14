@@ -221,7 +221,7 @@ export const openApiSpec = {
       get: {
         tags: ["Health"],
         summary: "API Health Check",
-        description: "Returns operational health status. Used by Render and load balancers.",
+        description: "Returns the operational health status of the API.",
         responses: {
           200: {
             description: "Service is operational",

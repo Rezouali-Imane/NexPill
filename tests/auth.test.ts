@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
 const { mockGetUser } = vi.hoisted(() => ({
@@ -13,7 +13,6 @@ vi.mock("../src/config/supabase", () => ({
   },
 }));
 
-
 import { app } from "../src/app";
 
 describe("Auth Endpoints", () => {
@@ -22,13 +21,14 @@ describe("Auth Endpoints", () => {
   });
 
   describe("GET /auth/me", () => {
-    it("should return 401 if no Authorization header is provided", async () => {
+    it("returns 401 if no Authorization header is provided", async () => {
       const response = await request(app).get("/auth/me");
+
       expect(response.status).toBe(401);
       expect(response.body).toEqual({ error: "Missing bearer token" });
     });
 
-    it("should return 401 if token is invalid or expired", async () => {
+    it("returns 401 if the bearer token is invalid or expired", async () => {
       mockGetUser.mockResolvedValueOnce({
         data: { user: null },
         error: { message: "Invalid token" },
@@ -40,9 +40,10 @@ describe("Auth Endpoints", () => {
 
       expect(response.status).toBe(401);
       expect(response.body).toEqual({ error: "Invalid or expired token" });
+      expect(mockGetUser).toHaveBeenCalledWith("invalid-token");
     });
 
-    it("should return user details if token is valid", async () => {
+    it("returns user details if the bearer token is valid", async () => {
       mockGetUser.mockResolvedValueOnce({
         data: {
           user: {
@@ -62,6 +63,7 @@ describe("Auth Endpoints", () => {
         id: "11111111-1111-4111-a111-111111111111",
         email: "patient@nexpill.test",
       });
+      expect(mockGetUser).toHaveBeenCalledWith("valid-token");
     });
   });
 });

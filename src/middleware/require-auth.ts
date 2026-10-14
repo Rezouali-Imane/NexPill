@@ -15,9 +15,7 @@ export const requireAuth: RequestHandler = async (request, response, next) => {
   }
 
   const authorization = request.header("authorization");
-  const token = authorization?.startsWith("Bearer ")
-    ? authorization.slice("Bearer ".length).trim()
-    : undefined;
+  const token = authorization?.match(/^Bearer\s+(\S+)$/i)?.[1];
 
   if (!token) {
     response.status(401).json({ error: "Missing bearer token" });
