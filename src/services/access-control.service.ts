@@ -1,7 +1,7 @@
 import { prisma } from "../db/prisma";
 import { ForbiddenError } from "../errors";
 
-export type AccessLevel = "read" | "write";
+export type AccessLevel = "read" | "write" | "record_dose";
 
 export class AccessControlService {
   /**
@@ -28,7 +28,7 @@ export class AccessControlService {
     }
 
     // Platform admins can access patient records without caregiver access.
-    if (actorUser?.platformRole === "ADMIN") {
+    if (actorUser.platformRole === "ADMIN") {
       return;
     }
 
@@ -56,6 +56,12 @@ export class AccessControlService {
     if (action === "write" && !access.canManageMedications) {
       throw new ForbiddenError(
         "Your caregiver permissions do not allow modifying or managing this patient's medications.",
+      );
+    }
+
+    if (action === "record_dose" && !access.canRecordDoses) {
+      throw new ForbiddenError(
+        "Your caregiver permissions do not allow recording doses for this patient.",
       );
     }
   }
