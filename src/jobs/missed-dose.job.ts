@@ -91,6 +91,9 @@ export class MissedDoseJobService {
             });
 
             for (const caregiver of caregivers) {
+              if (!caregiver.caregiverId) {
+                continue;
+              }
               const dedupeKey = `missed-dose-${dose.id}-${caregiver.caregiverId}`;
               await tx.caregiverAlert.upsert({
                 where: { dedupeKey },

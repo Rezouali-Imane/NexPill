@@ -187,7 +187,7 @@ model NotificationEndpoint {
 
 model CaregiverAccess {
   id          String       @id @default(uuid()) @db.Uuid
-  caregiverId String       @db.Uuid
+  caregiverId String?      @db.Uuid
   patientId   String       @db.Uuid
   status      AccessStatus @default(PENDING)
 
@@ -205,7 +205,7 @@ model CaregiverAccess {
   createdAt       DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(6)
 
-  caregiver   User @relation("AccessCaregiver", fields: [caregiverId], references: [id], onDelete: Cascade)
+  caregiver   User? @relation("AccessCaregiver", fields: [caregiverId], references: [id], onDelete: Cascade)
   patient     User @relation("AccessPatient", fields: [patientId], references: [id], onDelete: Cascade)
   requestedBy User @relation("AccessRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
 
