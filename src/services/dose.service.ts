@@ -76,31 +76,6 @@ export class DoseService {
   ) {
     const validDoseId = validateUuid(doseId, "doseId");
 
-    // Idempotency replay check if client provided an idempotencyKey
-    if (dto?.idempotencyKey) {
-      const existingKey = validateNonEmptyString(dto.idempotencyKey, "idempotencyKey");
-      const existingEvent = await prisma.doseEvent.findUnique({
-        where: { idempotencyKey: existingKey },
-        include: {
-          dose: {
-            include: {
-              schedule: {
-                include: { medication: true, reminder: true },
-              },
-            },
-          },
-        },
-      });
-
-      if (existingEvent) {
-        return {
-          dose: existingEvent.dose,
-          event: existingEvent,
-          message: "Idempotent response: action already processed with this key.",
-        };
-      }
-    }
-
     const dose = await prisma.scheduledDose.findUnique({
       where: { id: validDoseId },
       include: {
@@ -128,6 +103,32 @@ export class DoseService {
       "record_dose",
     );
 
+    const idempotencyKey = dto?.idempotencyKey
+      ? validateNonEmptyString(dto.idempotencyKey, "idempotencyKey")
+      : undefined;
+    if (idempotencyKey) {
+      const existingEvent = await prisma.doseEvent.findUnique({
+        where: { idempotencyKey },
+        include: {
+          dose: {
+            include: {
+              schedule: {
+                include: { medication: true, reminder: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (existingEvent) {
+        return {
+          dose: existingEvent.dose,
+          event: existingEvent,
+          message: "Idempotent response: action already processed with this key.",
+        };
+      }
+    }
+
     // Terminal status check
     if (dose.status === "CANCELLED") {
       throw new BadRequestError("Cannot change the status of a CANCELLED dose.");
@@ -147,8 +148,7 @@ export class DoseService {
     const occurredAt = dto?.occurredAt
       ? parseDate(dto.occurredAt, "occurredAt")
       : new Date();
-    const idempotencyKey =
-      dto?.idempotencyKey?.trim() || crypto.randomUUID();
+    const eventIdempotencyKey = idempotencyKey ?? crypto.randomUUID();
     const note = validateOptionalString(dto?.note, "note") ?? null;
 
     const result = await prisma.$transaction(async (tx) => {
@@ -162,7 +162,7 @@ export class DoseService {
           actorUserId,
           occurredAt,
           recordedAt: new Date(),
-          idempotencyKey,
+          idempotencyKey: eventIdempotencyKey,
           note,
         },
       });

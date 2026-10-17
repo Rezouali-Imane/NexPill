@@ -203,10 +203,29 @@ describe("Missed Dose Detection Job & Trigger", () => {
   });
 
   describe("POST /doses/jobs/detect-missed", () => {
-    it("allows authenticated user to manually trigger the detection job", async () => {
+    it("rejects a non-admin authenticated user", async () => {
       mockGetUser.mockResolvedValueOnce({
         data: { user: { id: patientId, email: "patient@nexpill.test" } },
         error: null,
+      });
+
+      const response = await request(app)
+        .post("/doses/jobs/detect-missed")
+        .set("Authorization", "Bearer test-token")
+        .send({ referenceTime: "2026-10-16T11:00:00.000Z" });
+
+      expect(response.status).toBe(403);
+      expect(mockPrisma.scheduledDose.findMany).not.toHaveBeenCalled();
+    });
+
+    it("allows an admin to manually trigger the detection job", async () => {
+      mockGetUser.mockResolvedValueOnce({
+        data: { user: { id: patientId, email: "patient@nexpill.test" } },
+        error: null,
+      });
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        platformRole: "ADMIN",
+        disabledAt: null,
       });
 
       mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([overdueDose]);

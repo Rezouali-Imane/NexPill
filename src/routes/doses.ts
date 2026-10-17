@@ -3,6 +3,7 @@ import { Router } from "express";
 import type { DoseStatus } from "@prisma/client";
 import { MissedDoseJobService } from "../jobs/missed-dose.job";
 import { requireAuth } from "../middleware/require-auth";
+import { requireRole } from "../middleware/require-role";
 import { DoseService } from "../services/dose.service";
 import { getParamString } from "../utils/validation";
 
@@ -86,7 +87,7 @@ doseRouter.post("/generate", async (req: Request, res: Response, next: NextFunct
  * POST /doses/jobs/detect-missed
  * Manually or externally triggers the missed-doses detection job.
  */
-doseRouter.post("/jobs/detect-missed", async (req: Request, res: Response, next: NextFunction) => {
+doseRouter.post("/jobs/detect-missed", requireRole("ADMIN"), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const referenceTime = req.body?.referenceTime
       ? new Date(req.body.referenceTime)
