@@ -20,6 +20,7 @@ export const openApiSpec = {
     { name: "Auth", description: "Supabase authentication verification" },
     { name: "Medications", description: "Prescription and over-the-counter medication CRUD" },
     { name: "Schedules", description: "Dosage recurrence schedules and caregiver reminder rules" },
+    { name: "Doses", description: "Medication adherence tracking (Taken, Skipped, Unable to Take) and scheduled dose lifecycle" },
   ],
   components: {
     securitySchemes: {
@@ -212,6 +213,57 @@ export const openApiSpec = {
               notifyCaregivers: { type: "boolean" },
             },
           },
+        },
+      },
+      DoseEvent: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          doseId: { type: "string", format: "uuid" },
+          fromStatus: { type: "string", enum: ["PENDING", "TAKEN", "SKIPPED", "UNABLE_TO_TAKE", "MISSED", "CANCELLED"] },
+          toStatus: { type: "string", enum: ["PENDING", "TAKEN", "SKIPPED", "UNABLE_TO_TAKE", "MISSED", "CANCELLED"] },
+          source: { type: "string", enum: ["PATIENT", "CAREGIVER", "DEVICE", "SYSTEM"] },
+          actorUserId: { type: "string", format: "uuid", nullable: true },
+          occurredAt: { type: "string", format: "date-time" },
+          recordedAt: { type: "string", format: "date-time" },
+          idempotencyKey: { type: "string" },
+          note: { type: "string", nullable: true },
+        },
+      },
+      ScheduledDose: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          scheduleId: { type: "string", format: "uuid" },
+          patientId: { type: "string", format: "uuid" },
+          scheduledAt: { type: "string", format: "date-time" },
+          localDate: { type: "string", format: "date" },
+          timeZone: { type: "string" },
+          lateAfterAt: { type: "string", format: "date-time" },
+          missedDeadlineAt: { type: "string", format: "date-time" },
+          status: { type: "string", enum: ["PENDING", "TAKEN", "SKIPPED", "UNABLE_TO_TAKE", "MISSED", "CANCELLED"], example: "PENDING" },
+          version: { type: "integer" },
+          resolvedAt: { type: "string", format: "date-time", nullable: true },
+          resolvedSource: { type: "string", enum: ["PATIENT", "CAREGIVER", "DEVICE", "SYSTEM"], nullable: true },
+          schedule: { $ref: "#/components/schemas/MedicationSchedule" },
+          events: { type: "array", items: { $ref: "#/components/schemas/DoseEvent" } },
+        },
+      },
+      RecordDoseDto: {
+        type: "object",
+        properties: {
+          occurredAt: { type: "string", format: "date-time", example: "2026-10-16T08:05:00.000Z" },
+          note: { type: "string", example: "Taken with breakfast" },
+          idempotencyKey: { type: "string", example: "client-idemp-12345" },
+        },
+      },
+      GenerateDosesDto: {
+        type: "object",
+        required: ["scheduleId", "startDate", "endDate"],
+        properties: {
+          scheduleId: { type: "string", format: "uuid" },
+          startDate: { type: "string", format: "date", example: "2026-10-16" },
+          endDate: { type: "string", format: "date", example: "2026-10-23" },
         },
       },
     },
@@ -579,6 +631,241 @@ export const openApiSpec = {
                   properties: {
                     message: { type: "string" },
                     schedule: { $ref: "#/components/schemas/MedicationSchedule" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/doses/{id}/taken": {
+      post: {
+        tags: ["Doses"],
+        summary: "Record Dose as Taken",
+        description: "Transitions dose status to TAKEN and logs an immutable audit event.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RecordDoseDto" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Dose marked as taken",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    dose: { $ref: "#/components/schemas/ScheduledDose" },
+                    event: { $ref: "#/components/schemas/DoseEvent" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/doses/{id}/skipped": {
+      post: {
+        tags: ["Doses"],
+        summary: "Record Dose as Skipped",
+        description: "Transitions dose status to SKIPPED with an optional clinical or user reason.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RecordDoseDto" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Dose marked as skipped",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    dose: { $ref: "#/components/schemas/ScheduledDose" },
+                    event: { $ref: "#/components/schemas/DoseEvent" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/doses/{id}/unable-to-take": {
+      post: {
+        tags: ["Doses"],
+        summary: "Record Dose as Unable to Take",
+        description: "Transitions dose status to UNABLE_TO_TAKE (e.g. vomiting, acute side effects) with optional notes.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RecordDoseDto" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Dose marked as unable to take",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    dose: { $ref: "#/components/schemas/ScheduledDose" },
+                    event: { $ref: "#/components/schemas/DoseEvent" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/doses/{id}": {
+      get: {
+        tags: ["Doses"],
+        summary: "Get Dose by ID",
+        description: "Retrieves scheduled dose details with schedule, medication, and full event audit trail.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          200: {
+            description: "Scheduled dose details",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    dose: { $ref: "#/components/schemas/ScheduledDose" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/doses": {
+      get: {
+        tags: ["Doses"],
+        summary: "List Scheduled Doses",
+        description: "Lists scheduled doses for the patient with filters by status, dates, and medication.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "patientId", in: "query", schema: { type: "string", format: "uuid" } },
+          { name: "status", in: "query", schema: { type: "string" } },
+          { name: "startDate", in: "query", schema: { type: "string", format: "date" } },
+          { name: "endDate", in: "query", schema: { type: "string", format: "date" } },
+          { name: "medicationId", in: "query", schema: { type: "string", format: "uuid" } },
+          { name: "scheduleId", in: "query", schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          200: {
+            description: "List of scheduled doses",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    doses: { type: "array", items: { $ref: "#/components/schemas/ScheduledDose" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/doses/generate": {
+      post: {
+        tags: ["Doses"],
+        summary: "Generate Doses from Schedule",
+        description: "Generates pending ScheduledDose records for a schedule across a date range.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/GenerateDosesDto" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Generated doses",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: { type: "string" },
+                    count: { type: "integer" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/doses/jobs/detect-missed": {
+      post: {
+        tags: ["Doses"],
+        summary: "Trigger Missed Doses Detection Job",
+        description: "Scans for overdue pending doses past their missedDeadlineAt, transitions them to MISSED, and creates caregiver alerts.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  referenceTime: { type: "string", format: "date-time" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Job execution report",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    result: {
+                      type: "object",
+                      properties: {
+                        runAt: { type: "string", format: "date-time" },
+                        missedCount: { type: "integer" },
+                        processedDoseIds: { type: "array", items: { type: "string" } },
+                        alertsCreatedCount: { type: "integer" },
+                      },
+                    },
                   },
                 },
               },
