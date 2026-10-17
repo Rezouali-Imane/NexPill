@@ -874,5 +874,71 @@ export const openApiSpec = {
         },
       },
     },
+    "/caregiver-access/invites": {
+      post: {
+        tags: ["Caregiver Access"],
+        summary: "Create a caregiver invitation",
+        description: "Creates a single-use invitation token that expires after seven days.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  canViewSchedule: { type: "boolean", default: true },
+                  canViewHistory: { type: "boolean", default: true },
+                  canReceiveAlerts: { type: "boolean", default: true },
+                  canRecordDoses: { type: "boolean", default: false },
+                  canManageMedications: { type: "boolean", default: false },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Invitation created. The token is returned only in this response.",
+          },
+        },
+      },
+    },
+    "/caregiver-access/invites/accept": {
+      post: {
+        tags: ["Caregiver Access"],
+        summary: "Accept a caregiver invitation",
+        description: "Links the authenticated Supabase user to the patient represented by the invitation.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["token"],
+                properties: {
+                  token: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Invitation accepted." },
+          404: { description: "Invitation not found or expired." },
+        },
+      },
+    },
+    "/caregiver-access": {
+      get: {
+        tags: ["Caregiver Access"],
+        summary: "List caregiver relationships",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: { description: "Relationships for the authenticated user." },
+        },
+      },
+    },
   },
 };

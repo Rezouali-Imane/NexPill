@@ -10,6 +10,7 @@ import { authRouter } from "./routes/auth";
 import { medicationRouter } from "./routes/medications";
 import { scheduleRouter } from "./routes/schedules";
 import { doseRouter } from "./routes/doses";
+import { caregiverAccessRouter } from "./routes/caregiver-access";
 
 export const app = express();
 
@@ -32,6 +33,6 @@ app.use("/auth", authRouter);
 app.use("/medications", medicationRouter);
 app.use("/schedules", scheduleRouter);
 app.use("/doses", doseRouter);
+app.use("/caregiver-access", caregiverAccessRouter);
 app.use(notFound);
 app.use(errorHandler);
-
