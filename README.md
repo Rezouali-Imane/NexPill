@@ -157,6 +157,20 @@ GET /caregiver-access
 Authorization: Bearer <caregiver-access-token>
 ```
 
+Caregivers with schedule-view permission can request a patient-local daily
+dose summary:
+
+```http
+GET /caregiver-access/<patient-id>/daily-summary?date=2026-10-17
+Authorization: ******
+```
+
+The response contains `scheduled`, `taken`, `skipped`, and `missed` totals.
+`scheduled` includes every non-cancelled dose for that local calendar date;
+the other totals count only doses with the matching status. Pending and
+`UNABLE_TO_TAKE` doses are included in `scheduled` but are not counted as
+taken, skipped, or missed.
+
 The token is stored only as a SHA-256 hash, expires after seven days, is
 cleared on acceptance, and cannot be reused. New invitations start with dose
 recording and medication-management permissions disabled. The patient ID is

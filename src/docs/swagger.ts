@@ -940,5 +940,53 @@ export const openApiSpec = {
         },
       },
     },
+    "/caregiver-access/{patientId}/daily-summary": {
+      get: {
+        tags: ["Caregiver Access"],
+        summary: "Get a patient's daily dose summary",
+        description: "Counts non-cancelled scheduled doses for the patient's local calendar date. Caregivers must have active schedule-view permission.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: "patientId",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            name: "date",
+            in: "query",
+            required: true,
+            description: "Patient-local calendar date.",
+            schema: { type: "string", format: "date" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Daily dose totals.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    summary: {
+                      type: "object",
+                      required: ["date", "scheduled", "taken", "skipped", "missed"],
+                      properties: {
+                        date: { type: "string", format: "date" },
+                        scheduled: { type: "integer", minimum: 0 },
+                        taken: { type: "integer", minimum: 0 },
+                        skipped: { type: "integer", minimum: 0 },
+                        missed: { type: "integer", minimum: 0 },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
 };

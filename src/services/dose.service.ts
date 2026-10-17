@@ -32,7 +32,59 @@ export interface GenerateDosesDto {
   endDate: string | Date;
 }
 
+export interface DailyDoseSummary {
+  date: string;
+  scheduled: number;
+  taken: number;
+  skipped: number;
+  missed: number;
+}
+
 export class DoseService {
+  /**
+   * Summarizes non-cancelled doses by their patient-local calendar date.
+   */
+  static async getDailySummary(
+    actorUserId: string,
+    patientId: string,
+    date: string,
+  ): Promise<DailyDoseSummary> {
+    const targetPatientId = validateUuid(patientId, "patientId");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestError("date must use YYYY-MM-DD format.");
+    }
+    const day = new Date(`${date}T00:00:00.000Z`);
+    if (
+      Number.isNaN(day.getTime()) ||
+      day.toISOString().slice(0, 10) !== date
+    ) {
+      throw new BadRequestError("date must be a valid calendar date.");
+    }
+
+    await AccessControlService.assertPatientAccess(
+      actorUserId,
+      targetPatientId,
+      "read",
+    );
+
+    const doses = await prisma.scheduledDose.findMany({
+      where: {
+        patientId: targetPatientId,
+        localDate: day,
+        status: { not: "CANCELLED" },
+      },
+      select: { status: true },
+    });
+
+    return {
+      date,
+      scheduled: doses.length,
+      taken: doses.filter((dose) => dose.status === "TAKEN").length,
+      skipped: doses.filter((dose) => dose.status === "SKIPPED").length,
+      missed: doses.filter((dose) => dose.status === "MISSED").length,
+    };
+  }
+
   /**
    * Marks a scheduled dose as TAKEN.
    */

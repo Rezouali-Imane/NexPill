@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/require-auth";
 import { CaregiverAccessService } from "../services/caregiver-access.service";
-import { validateNonEmptyString } from "../utils/validation";
+import { DoseService } from "../services/dose.service";
+import { getParamString, validateNonEmptyString } from "../utils/validation";
 
 export const caregiverAccessRouter = Router();
 caregiverAccessRouter.use(requireAuth);
@@ -40,6 +41,20 @@ caregiverAccessRouter.get("/", async (request, response, next) => {
   try {
     const access = await CaregiverAccessService.listForUser(request.user!.id);
     response.json({ access });
+  } catch (error) {
+    next(error);
+  }
+});
+
+caregiverAccessRouter.get("/:patientId/daily-summary", async (request, response, next) => {
+  try {
+    const date = validateNonEmptyString(request.query.date, "date");
+    const summary = await DoseService.getDailySummary(
+      request.user!.id,
+      getParamString(request.params.patientId),
+      date,
+    );
+    response.json({ summary });
   } catch (error) {
     next(error);
   }
