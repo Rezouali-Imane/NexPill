@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { app } from "./app";
 import { env } from "./config/env";
 import { prisma } from "./db/prisma";
@@ -5,8 +6,14 @@ import {
   startMissedDoseScheduler,
   stopMissedDoseScheduler,
 } from "./jobs/missed-dose.job";
+import {
+  closeDoseRealtime,
+  initializeDoseRealtime,
+} from "./realtime/dose-events";
 
-const server = app.listen(env.port, env.host, () => {
+const server = createServer(app);
+initializeDoseRealtime(server);
+server.listen(env.port, env.host, () => {
   console.log(`NexPill API listening on http://${env.host}:${env.port} (${env.nodeEnv})`);
 });
 
@@ -20,6 +27,7 @@ const gracefulShutdown = (signal: string) => {
   stopMissedDoseScheduler();
   server.close(async () => {
     try {
+      await closeDoseRealtime();
       await prisma.$disconnect();
       console.log("Database connection closed. Shutdown complete.");
       process.exit(0);
@@ -41,4 +49,3 @@ const gracefulShutdown = (signal: string) => {
 
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-
