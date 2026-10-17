@@ -1,4 +1,5 @@
 import { prisma } from "../db/prisma";
+import { emitDoseUpdate } from "../realtime/dose-events";
 
 export interface MissedDoseJobResult {
   runAt: Date;
@@ -49,10 +50,10 @@ export class MissedDoseJobService {
 
     for (const dose of overdueDoses) {
       try {
-        await prisma.$transaction(async (tx) => {
+        const processed = await prisma.$transaction(async (tx) => {
           // 1. Mark dose as MISSED (with optimistic concurrency check)
-          await tx.scheduledDose.update({
-            where: { id: dose.id },
+          const updated = await tx.scheduledDose.updateMany({
+            where: { id: dose.id, status: "PENDING" },
             data: {
               status: "MISSED",
               resolvedAt: referenceTime,
@@ -60,6 +61,9 @@ export class MissedDoseJobService {
               version: { increment: 1 },
             },
           });
+          if (updated.count !== 1) {
+            return false;
+          }
 
           // 2. Create DoseEvent audit record
           await tx.doseEvent.create({
@@ -113,9 +117,22 @@ export class MissedDoseJobService {
               alertsCreatedCount++;
             }
           }
+
+          return true;
         });
 
-        processedDoseIds.push(dose.id);
+        if (processed) {
+          processedDoseIds.push(dose.id);
+          emitDoseUpdate({
+            doseId: dose.id,
+            patientId: dose.patientId,
+            status: "MISSED",
+            fromStatus: "PENDING",
+            toStatus: "MISSED",
+            source: "SYSTEM",
+            occurredAt: dose.missedDeadlineAt,
+          });
+        }
       } catch (err) {
         console.error(`[MissedDoseJob] Failed to process missed dose ${dose.id}:`, err);
       }
