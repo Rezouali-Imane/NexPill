@@ -15,6 +15,7 @@ const { mockGetUser, mockPrisma } = vi.hoisted(() => {
       scheduledDose: {
         findMany: vi.fn(),
         update: vi.fn(),
+        updateMany: vi.fn(),
       },
       doseEvent: {
         create: vi.fn(),
@@ -87,6 +88,7 @@ describe("Missed Dose Detection Job & Trigger", () => {
       platformRole: "USER",
       disabledAt: null,
     });
+    mockPrisma.scheduledDose.updateMany.mockResolvedValue({ count: 1 });
 
     // Default $transaction execution passes through callback
     mockPrisma.$transaction.mockImplementation(
@@ -105,7 +107,7 @@ describe("Missed Dose Detection Job & Trigger", () => {
       expect(result.missedCount).toBe(0);
       expect(result.processedDoseIds).toEqual([]);
       expect(result.alertsCreatedCount).toBe(0);
-      expect(mockPrisma.scheduledDose.update).not.toHaveBeenCalled();
+      expect(mockPrisma.scheduledDose.updateMany).not.toHaveBeenCalled();
     });
 
     it("detects overdue doses, transitions status to MISSED, and records SYSTEM DoseEvent", async () => {
@@ -129,9 +131,9 @@ describe("Missed Dose Detection Job & Trigger", () => {
       expect(result.alertsCreatedCount).toBe(1);
 
       // Verify dose updated to MISSED
-      expect(mockPrisma.scheduledDose.update).toHaveBeenCalledWith(
+      expect(mockPrisma.scheduledDose.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: doseId },
+          where: { id: doseId, status: "PENDING" },
           data: expect.objectContaining({
             status: "MISSED",
             resolvedSource: "SYSTEM",
@@ -187,6 +189,19 @@ describe("Missed Dose Detection Job & Trigger", () => {
       expect(result.missedCount).toBe(1);
       expect(result.alertsCreatedCount).toBe(0);
       expect(mockPrisma.caregiverAccess.findMany).not.toHaveBeenCalled();
+      expect(mockPrisma.caregiverAlert.upsert).not.toHaveBeenCalled();
+    });
+
+    it("does not create an event when another worker already resolved the dose", async () => {
+      mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([overdueDose]);
+      mockPrisma.scheduledDose.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      const result = await MissedDoseJobService.detectAndMarkMissedDoses(
+        new Date("2026-10-16T10:30:00.000Z"),
+      );
+
+      expect(result.missedCount).toBe(0);
+      expect(mockPrisma.doseEvent.create).not.toHaveBeenCalled();
       expect(mockPrisma.caregiverAlert.upsert).not.toHaveBeenCalled();
     });
   });
