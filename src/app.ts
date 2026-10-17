@@ -11,6 +11,7 @@ import { medicationRouter } from "./routes/medications";
 import { scheduleRouter } from "./routes/schedules";
 import { doseRouter } from "./routes/doses";
 import { caregiverAccessRouter } from "./routes/caregiver-access";
+import { mcpRouter } from "./routes/mcp";
 
 export const app = express();
 
@@ -34,5 +35,6 @@ app.use("/medications", medicationRouter);
 app.use("/schedules", scheduleRouter);
 app.use("/doses", doseRouter);
 app.use("/caregiver-access", caregiverAccessRouter);
+app.use("/mcp", mcpRouter);
 app.use(notFound);
 app.use(errorHandler);

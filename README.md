@@ -101,6 +101,26 @@ administrative role management until dedicated audit and approval workflows
 exist. In particular, `record_dose` is the only write tool in the initial
 scope.
 
+### Current MCP transport and medication lookup
+
+The initial server skeleton is available at `POST /mcp` using the MCP
+Streamable HTTP transport. The endpoint requires both a valid Supabase bearer
+token and an enabled application user (`USER` or `ADMIN`). MCP clients must
+send the token in the HTTP `Authorization` header; it is never accepted as a
+tool argument.
+
+The currently implemented tool is:
+
+| Tool | Input | Source |
+| --- | --- | --- |
+| `lookup_medication_information` | `{ medicationName: string }` | NIH RxNorm public terminology API |
+
+This tool is read-only and returns RxCUI/name terminology matches. RxNorm is
+used without an API credential. The upstream URL, timeout, response parsing,
+and error messages are controlled by the server; clients cannot select an
+arbitrary URL or provide upstream credentials. The result is reference
+terminology only, not prescribing, diagnosis, dosage, or emergency advice.
+
 ### Authorization boundaries
 
 Every tool must authenticate the caller with Supabase Auth and resolve the
