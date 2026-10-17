@@ -9,6 +9,7 @@ import {
   validateUuid,
 } from "../utils/validation";
 import { AccessControlService } from "./access-control.service";
+import { emitDoseUpdate } from "../realtime/dose-events";
 
 export interface RecordDoseActionDto {
   occurredAt?: string | Date;
@@ -202,6 +203,17 @@ export class DoseService {
       });
 
       return { dose: updatedDose, event };
+    });
+
+    emitDoseUpdate({
+      doseId: result.dose.id,
+      patientId: result.dose.patientId,
+      status: result.dose.status,
+      eventId: result.event.id,
+      fromStatus: result.event.fromStatus,
+      toStatus: result.event.toStatus,
+      source: result.event.source,
+      occurredAt: result.event.occurredAt,
     });
 
     return result;
