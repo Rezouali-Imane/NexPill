@@ -1,0 +1,9 @@
+.label { display: block; font-weight: 600; font-size: 1.0625rem; margin-bottom: 6px; }
+.hint { color: var(--nx-muted); font-size: 1rem; margin-bottom: 8px; }
+.input {
+  width: 100%; min-height: 52px; padding: 14px 16px; font: inherit; font-size: 1.125rem; color: var(--nx-ink);
+  background: #fff; border: 1.5px solid #c9d3d2; border-radius: var(--nx-r-sm); resize: vertical;
+}
+.input:focus-visible { outline: none; border-color: var(--nx-primary); box-shadow: var(--nx-focus); }
+.input[aria-invalid='true'] { border-color: var(--nx-concern-ink); }
+.error { color: var(--nx-concern-ink); font-weight: 600; margin-top: 6px; font-size: 1rem; }

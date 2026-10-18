@@ -1,0 +1,11 @@
+.stack { position: fixed; right: 24px; bottom: 24px; z-index: 60; display: grid; gap: 12px; max-width: min(420px, calc(100vw - 32px)); }
+.toast {
+  display: flex; align-items: center; gap: 12px; padding: 16px 16px 16px 20px; border-radius: var(--nx-r-md);
+  background: var(--nx-nav); color: #fff; box-shadow: var(--nx-shadow-modal); font-weight: 600; font-size: 1.0625rem;
+  animation: up .18s ease-out;
+}
+.toast > span { flex: 1; }
+.toast button { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; border: 0; background: transparent; color: #fff; }
+.toast button:focus-visible { box-shadow: var(--nx-focus-dark); }
+.error { background: #7d2a27; }
+@keyframes up { from { opacity: 0; transform: translateY(10px); } }
