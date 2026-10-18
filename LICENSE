@@ -1,21 +1,41 @@
-MIT License
+NEXPILL CUSTOM PROPRIETARY LICENSE
 
-Copyright (c) 2026 imane 🌸
+Copyright (c) 2026 Rezouali Imane and Meliani Abdel Hak.
+All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. Ownership
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+   NexPill, including its source code, documentation, database definitions,
+   designs, and related materials, is proprietary work owned by Rezouali Imane
+   and Meliani Abdel Hak, except for third-party components identified by their
+   respective licenses.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. Permission
+
+   No permission is granted to use, copy, modify, merge, publish, distribute,
+   sublicense, sell, or create derivative works from NexPill without prior
+   written permission from both Rezouali Imane and Meliani Abdel Hak.
+
+3. Limited access
+
+   Access granted for personal evaluation, academic review, or development
+   does not transfer ownership and does not grant redistribution or commercial
+   rights. Any permitted copy must retain this license and all copyright
+   notices.
+
+4. Third-party components
+
+   This license does not replace or restrict the licenses of third-party
+   dependencies. Those dependencies remain governed by their own license
+   terms.
+
+5. Disclaimer
+
+   NEXPILL IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY,
+   WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF,
+   OR IN CONNECTION WITH NEXPILL OR THE USE OF NEXPILL.
+
+For licensing requests or written permissions, contact both copyright holders.

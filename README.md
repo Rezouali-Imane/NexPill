@@ -4,6 +4,7 @@ NexPill is a smart medication management platform for patients and caregivers.
 It is designed to support medication schedules, dose tracking, reminders,
 caregiver access, safety checks, and adherence insights.
 
+
 ## Backend
 
 The backend uses Node.js, TypeScript, Express, Prisma, and Supabase PostgreSQL.
@@ -197,3 +198,11 @@ recording and medication-management permissions disabled. The patient ID is
 never embedded in the token.
 
 Application features are being developed incrementally.
+
+## License
+
+NexPill is distributed under the **NexPill Custom Proprietary License**.
+It is not released under the MIT License. Use, copying, modification,
+distribution, commercial use, and derivative works require prior written
+permission from both Rezouali Imane and Meliani Abdel Hak. See
+[LICENSE](./LICENSE) for the complete terms.
