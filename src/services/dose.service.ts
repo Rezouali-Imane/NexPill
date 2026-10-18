@@ -10,6 +10,7 @@ import {
 } from "../utils/validation";
 import { AccessControlService } from "./access-control.service";
 import { emitDoseUpdate } from "../realtime/dose-events";
+import { NotificationService } from "./notification.service";
 
 export interface RecordDoseActionDto {
   occurredAt?: string | Date;
@@ -254,6 +255,18 @@ export class DoseService {
         },
       });
 
+      // 4. Cancel any pending reminder notifications for this dose
+      await tx.notification.updateMany({
+        where: {
+          doseId: dose.id,
+          status: "SCHEDULED",
+        },
+        data: {
+          status: "CANCELLED",
+          lastError: `Dose resolved as ${targetStatus}.`,
+        },
+      });
+
       return { dose: updatedDose, event };
     });
 
@@ -455,6 +468,15 @@ export class DoseService {
           });
 
           generatedDoses.push(dose);
+          await NotificationService.scheduleDoseReminders({
+            id: dose.id,
+            patientId: schedule.medication.patientId,
+            scheduledAt: dose.scheduledAt ?? scheduledAt,
+            status: dose.status ?? "PENDING",
+            schedule: {
+              reminder: schedule.reminder,
+            },
+          });
         }
       }
 

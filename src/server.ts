@@ -7,6 +7,10 @@ import {
   stopMissedDoseScheduler,
 } from "./jobs/missed-dose.job";
 import {
+  startNotificationDispatcher,
+  stopNotificationDispatcher,
+} from "./jobs/notification.job";
+import {
   closeDoseRealtime,
   initializeDoseRealtime,
 } from "./realtime/dose-events";
@@ -17,14 +21,16 @@ server.listen(env.port, env.host, () => {
   console.log(`NexPill API listening on http://${env.host}:${env.port} (${env.nodeEnv})`);
 });
 
-// Start scheduled job for missed doses in non-test environments
+// Start scheduled jobs in non-test environments
 if (process.env.NODE_ENV !== "test" && process.env.DISABLE_BACKGROUND_JOBS !== "true") {
   startMissedDoseScheduler();
+  startNotificationDispatcher();
 }
 
 const gracefulShutdown = (signal: string) => {
   console.log(`Received ${signal}. Shutting down gracefully...`);
   stopMissedDoseScheduler();
+  stopNotificationDispatcher();
   server.close(async () => {
     try {
       await closeDoseRealtime();

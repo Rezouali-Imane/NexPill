@@ -34,6 +34,14 @@ const { mockGetUser, mockPrisma } = vi.hoisted(() => {
         updateMany: vi.fn(),
         upsert: vi.fn(),
       },
+      notification: {
+        updateMany: vi.fn(),
+        upsert: vi.fn(),
+        findMany: vi.fn(),
+      },
+      notificationEndpoint: {
+        findMany: vi.fn(),
+      },
       $transaction: vi.fn(),
     },
   };
@@ -97,6 +105,9 @@ describe("Dose Endpoints (/doses)", () => {
       platformRole: "USER",
       disabledAt: null,
     });
+    mockPrisma.notification.updateMany.mockResolvedValue({ count: 0 });
+    mockPrisma.notification.upsert.mockResolvedValue({ id: "notif-id" });
+    mockPrisma.notificationEndpoint.findMany.mockResolvedValue([]);
     // Default $transaction execution passes through callback
     mockPrisma.$transaction.mockImplementation(
       async (callback: (client: typeof mockPrisma) => unknown) => {
@@ -449,7 +460,10 @@ describe("Dose Endpoints (/doses)", () => {
         medication: { patientId },
         reminder: { lateAfterMin: 15, missedAfterMin: 120 },
       });
-      mockPrisma.scheduledDose.upsert.mockResolvedValue({ id: "generated-dose" });
+      mockPrisma.scheduledDose.upsert.mockResolvedValue({
+        id: "77777777-7777-4777-a777-777777777777",
+        status: "PENDING",
+      });
       mockPrisma.medicationSchedule.update.mockResolvedValueOnce({});
 
       const response = await request(app)

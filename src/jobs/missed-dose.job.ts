@@ -95,7 +95,7 @@ export class MissedDoseJobService {
                 continue;
               }
               const dedupeKey = `missed-dose-${dose.id}-${caregiver.caregiverId}`;
-              await tx.caregiverAlert.upsert({
+              const alert = await tx.caregiverAlert.upsert({
                 where: { dedupeKey },
                 create: {
                   patientId: dose.patientId,
@@ -118,6 +118,23 @@ export class MissedDoseJobService {
                 update: {},
               });
               alertsCreatedCount++;
+
+              const notifDedupeKey = `alert-notif-${alert.id}-IN_APP`;
+              await tx.notification.upsert({
+                where: { dedupeKey: notifDedupeKey },
+                create: {
+                  recipientId: caregiver.caregiverId,
+                  patientId: dose.patientId,
+                  alertId: alert.id,
+                  doseId: dose.id,
+                  kind: "CAREGIVER_ALERT",
+                  channel: "IN_APP",
+                  status: "SCHEDULED",
+                  scheduledFor: referenceTime,
+                  dedupeKey: notifDedupeKey,
+                },
+                update: {},
+              });
             }
           }
 

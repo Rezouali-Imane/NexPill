@@ -21,6 +21,7 @@ export const openApiSpec = {
     { name: "Medications", description: "Prescription and over-the-counter medication CRUD" },
     { name: "Schedules", description: "Dosage recurrence schedules and caregiver reminder rules" },
     { name: "Doses", description: "Medication adherence tracking (Taken, Skipped, Unable to Take) and scheduled dose lifecycle" },
+    { name: "Notifications", description: "Reminder notifications dispatch and delivery endpoint tracking" },
   ],
   components: {
     securitySchemes: {
@@ -264,6 +265,46 @@ export const openApiSpec = {
           scheduleId: { type: "string", format: "uuid" },
           startDate: { type: "string", format: "date", example: "2026-10-16" },
           endDate: { type: "string", format: "date", example: "2026-10-23" },
+        },
+      },
+      Notification: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          recipientId: { type: "string", format: "uuid" },
+          patientId: { type: "string", format: "uuid" },
+          doseId: { type: "string", format: "uuid", nullable: true },
+          alertId: { type: "string", format: "uuid", nullable: true },
+          kind: {
+            type: "string",
+            enum: ["DOSE_REMINDER", "DOSE_REMINDER_FOLLOWUP", "CAREGIVER_ALERT", "SAFETY_WARNING", "DAILY_SUMMARY"],
+            example: "DOSE_REMINDER",
+          },
+          channel: {
+            type: "string",
+            enum: ["IN_APP", "PUSH", "EMAIL", "SMS"],
+            example: "PUSH",
+          },
+          status: {
+            type: "string",
+            enum: ["SCHEDULED", "SENDING", "SENT", "DELIVERED", "FAILED", "CANCELLED"],
+            example: "SCHEDULED",
+          },
+          scheduledFor: { type: "string", format: "date-time" },
+          sentAt: { type: "string", format: "date-time", nullable: true },
+          deliveredAt: { type: "string", format: "date-time", nullable: true },
+          attemptCount: { type: "integer" },
+          dedupeKey: { type: "string" },
+        },
+      },
+      NotificationEndpoint: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          userId: { type: "string", format: "uuid" },
+          channel: { type: "string", enum: ["IN_APP", "PUSH", "EMAIL", "SMS"] },
+          address: { type: "string" },
+          enabled: { type: "boolean" },
         },
       },
     },
@@ -981,6 +1022,188 @@ export const openApiSpec = {
                       },
                     },
                   },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/notifications": {
+      get: {
+        tags: ["Notifications"],
+        summary: "List Notifications",
+        description: "Lists notifications for the authenticated recipient with filters for status, kind, channel, and dates.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "status", in: "query", schema: { type: "string" } },
+          { name: "kind", in: "query", schema: { type: "string" } },
+          { name: "channel", in: "query", schema: { type: "string" } },
+          { name: "doseId", in: "query", schema: { type: "string", format: "uuid" } },
+          { name: "startDate", in: "query", schema: { type: "string", format: "date" } },
+          { name: "endDate", in: "query", schema: { type: "string", format: "date" } },
+        ],
+        responses: {
+          200: {
+            description: "List of notifications",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    notifications: { type: "array", items: { $ref: "#/components/schemas/Notification" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/notifications/{id}/delivered": {
+      patch: {
+        tags: ["Notifications"],
+        summary: "Mark Notification as Delivered",
+        description: "Confirms delivery/reading of a notification by the recipient.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          200: {
+            description: "Updated notification",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { notification: { $ref: "#/components/schemas/Notification" } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/notifications/jobs/dispatch": {
+      post: {
+        tags: ["Notifications"],
+        summary: "Trigger Notification Dispatch Worker",
+        description: "Scans for SCHEDULED notifications due for delivery and transitions them to DELIVERED.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: { referenceTime: { type: "string", format: "date-time" } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Dispatch results",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    result: {
+                      type: "object",
+                      properties: {
+                        runAt: { type: "string", format: "date-time" },
+                        processedCount: { type: "integer" },
+                        deliveredCount: { type: "integer" },
+                        cancelledCount: { type: "integer" },
+                        failedCount: { type: "integer" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/notifications/doses/{doseId}/schedule": {
+      post: {
+        tags: ["Notifications"],
+        summary: "Schedule Reminders for a Dose",
+        description: "Generates pending reminder notifications for a dose based on schedule rules with deduplication.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "doseId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          201: {
+            description: "Scheduled reminders",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    scheduledCount: { type: "integer" },
+                    notificationIds: { type: "array", items: { type: "string" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/notifications/endpoints": {
+      get: {
+        tags: ["Notifications"],
+        summary: "List Registered Endpoints",
+        description: "Retrieves delivery channels (PUSH, EMAIL, SMS, IN_APP) registered for the user.",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: "List of endpoints",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    endpoints: { type: "array", items: { $ref: "#/components/schemas/NotificationEndpoint" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["Notifications"],
+        summary: "Register Notification Endpoint",
+        description: "Registers or enables a delivery address or device token for a channel.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["channel", "address"],
+                properties: {
+                  channel: { type: "string", enum: ["IN_APP", "PUSH", "EMAIL", "SMS"] },
+                  address: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Registered endpoint",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { endpoint: { $ref: "#/components/schemas/NotificationEndpoint" } },
                 },
               },
             },

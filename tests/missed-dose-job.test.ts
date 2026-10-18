@@ -23,6 +23,9 @@ const { mockGetUser, mockPrisma } = vi.hoisted(() => {
       caregiverAlert: {
         upsert: vi.fn(),
       },
+      notification: {
+        upsert: vi.fn(),
+      },
       $transaction: vi.fn(),
     },
   };
@@ -89,6 +92,7 @@ describe("Missed Dose Detection Job & Trigger", () => {
       disabledAt: null,
     });
     mockPrisma.scheduledDose.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.notification.upsert.mockResolvedValue({ id: "notif-1" });
 
     // Default $transaction execution passes through callback
     mockPrisma.$transaction.mockImplementation(

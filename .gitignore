@@ -16,3 +16,4 @@ Thumbs.db
 
 # Internal documentation requested to be gitignored
 BACKEND_DEV_GUIDE.md
+BACKEND_OVERVIEW.md
