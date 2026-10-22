@@ -24,6 +24,7 @@ export const openApiSpec = {
     { name: "Notifications", description: "Reminder notifications dispatch and delivery endpoint tracking" },
     { name: "Alerts", description: "Caregiver escalation alerts and adherence monitoring" },
     { name: "Adherence", description: "AI-driven adherence analytics, pattern detection, and caregiver summaries" },
+    { name: "Agent", description: "AI Clinical Agent query interface with strict medical safeguards" },
   ],
   components: {
     securitySchemes: {
@@ -1682,6 +1683,95 @@ export const openApiSpec = {
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/agent/query": {
+      post: {
+        tags: ["Agent"],
+        summary: "Query AI Clinical Agent",
+        description:
+          "Executes a natural language clinical adherence query against the Medical MCP server. Enforces clinical safeguards prohibiting dosage changes or treatment decisions.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query"],
+                properties: {
+                  query: { type: "string", example: "What patterns did you notice in Ahmed's evening doses?" },
+                  patientId: { type: "string", format: "uuid", nullable: true },
+                  useDemoData: { type: "boolean", default: false, description: "Analyze benchmark labeled demo data" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Agent response with safety metadata",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    response: { type: "string" },
+                    safeguardTriggered: { type: "boolean" },
+                    safeguardType: { type: "string", nullable: true },
+                    toolsInvoked: { type: "array", items: { type: "string" } },
+                    disclaimer: { type: "string" },
+                    data: { type: "object", nullable: true },
+                  },
+                },
+              },
+            },
+          },
+          400: {
+            description: "Invalid request payload or query",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: {
+            description: "Missing or invalid bearer token",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Forbidden: Actor lacks authorization to view this patient",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/agent/demo-data": {
+      get: {
+        tags: ["Agent"],
+        summary: "Get Labeled Benchmark Demo Profile",
+        description: "Returns benchmark demo profile (Ahmed: 5 daily medications with 18:00 evening friction) for demonstration and testing.",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Benchmark demo profile",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                },
               },
             },
           },

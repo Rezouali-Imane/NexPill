@@ -15,6 +15,7 @@ import { mcpRouter } from "./routes/mcp";
 import { notificationRouter } from "./routes/notifications";
 import { alertRouter } from "./routes/alerts";
 import { adherenceRouter } from "./routes/adherence";
+import { agentRouter } from "./routes/agent";
 
 export const app = express();
 
@@ -42,5 +43,6 @@ app.use("/mcp", mcpRouter);
 app.use("/notifications", notificationRouter);
 app.use("/alerts", alertRouter);
 app.use("/adherence", adherenceRouter);
+app.use("/agent", agentRouter);
 app.use(notFound);
 app.use(errorHandler);
