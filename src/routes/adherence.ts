@@ -71,3 +71,33 @@ adherenceRouter.post(
     }
   },
 );
+
+/**
+ * GET /adherence/:patientId/history
+ * Retrieves standardized chronological adherence history with observational outcomes
+ * (ON_TIME, LATE, UNCONFIRMED, MISSED, SKIPPED, UPCOMING) and confirmation latency.
+ */
+adherenceRouter.get(
+  "/:patientId/history",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const actorUserId = req.user!.id;
+      const patientId = getParamString(req.params.patientId);
+      const { startDate, endDate, limit } = req.query;
+
+      const history = await AdherenceAnalyticsService.getAdherenceHistory(
+        actorUserId,
+        patientId,
+        {
+          startDate: typeof startDate === "string" ? startDate : undefined,
+          endDate: typeof endDate === "string" ? endDate : undefined,
+          limit: limit ? Number(limit) : undefined,
+        },
+      );
+
+      res.json({ patientId, count: history.length, history });
+    } catch (error) {
+      next(error);
+    }
+  },
+);

@@ -66,6 +66,82 @@ describe("Adherence Analytics & AI Summaries", () => {
     });
   });
 
+  describe("AdherenceAnalyticsService.determineAdherenceResult", () => {
+    const fixedNow = new Date("2026-10-22T12:00:00Z");
+
+    it("evaluates dose taken within 15 min as ON_TIME", () => {
+      const scheduledAt = new Date("2026-10-22T08:00:00Z");
+      const resolvedAt = new Date("2026-10-22T08:05:00Z");
+      const res = AdherenceAnalyticsService.determineAdherenceResult(
+        "TAKEN",
+        scheduledAt,
+        resolvedAt,
+        null,
+        fixedNow,
+      );
+      expect(res.adherenceResult).toBe("ON_TIME");
+      expect(res.delayMinutes).toBe(5);
+    });
+
+    it("evaluates dose taken >= 15 min late as LATE", () => {
+      const scheduledAt = new Date("2026-10-22T08:00:00Z");
+      const resolvedAt = new Date("2026-10-22T08:45:00Z");
+      const res = AdherenceAnalyticsService.determineAdherenceResult(
+        "TAKEN",
+        scheduledAt,
+        resolvedAt,
+        null,
+        fixedNow,
+      );
+      expect(res.adherenceResult).toBe("LATE");
+      expect(res.delayMinutes).toBe(45);
+    });
+
+    it("evaluates dose taken early as ON_TIME with 0 delayMinutes", () => {
+      const scheduledAt = new Date("2026-10-22T08:00:00Z");
+      const resolvedAt = new Date("2026-10-22T07:55:00Z");
+      const res = AdherenceAnalyticsService.determineAdherenceResult(
+        "TAKEN",
+        scheduledAt,
+        resolvedAt,
+        null,
+        fixedNow,
+      );
+      expect(res.adherenceResult).toBe("ON_TIME");
+      expect(res.delayMinutes).toBe(0);
+    });
+
+    it("evaluates SKIPPED, MISSED, and UNABLE_TO_TAKE accurately", () => {
+      const past = new Date("2026-10-22T08:00:00Z");
+      expect(
+        AdherenceAnalyticsService.determineAdherenceResult("SKIPPED", past, null, null, fixedNow)
+          .adherenceResult,
+      ).toBe("SKIPPED");
+      expect(
+        AdherenceAnalyticsService.determineAdherenceResult("MISSED", past, null, null, fixedNow)
+          .adherenceResult,
+      ).toBe("MISSED");
+      expect(
+        AdherenceAnalyticsService.determineAdherenceResult("UNABLE_TO_TAKE", past, null, null, fixedNow)
+          .adherenceResult,
+      ).toBe("UNABLE_TO_TAKE");
+    });
+
+    it("evaluates past PENDING as UNCONFIRMED and future PENDING as UPCOMING", () => {
+      const past = new Date("2026-10-22T08:00:00Z");
+      const future = new Date("2026-10-22T18:00:00Z");
+
+      expect(
+        AdherenceAnalyticsService.determineAdherenceResult("PENDING", past, null, null, fixedNow)
+          .adherenceResult,
+      ).toBe("UNCONFIRMED");
+      expect(
+        AdherenceAnalyticsService.determineAdherenceResult("PENDING", future, null, null, fixedNow)
+          .adherenceResult,
+      ).toBe("UPCOMING");
+    });
+  });
+
   describe("AdherenceAnalyticsService.computeAdherenceMetrics", () => {
     it("aggregates dose counts, confirmation delays, rates, and time-of-day metrics", async () => {
       const scheduledDoses = [
@@ -178,6 +254,78 @@ describe("Adherence Analytics & AI Summaries", () => {
       expect(result.metrics.trend).toBe("IMPROVING");
     });
 
+    it("handles zero scheduled doses gracefully without division by zero errors", async () => {
+      mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([]);
+
+      const result = await AdherenceAnalyticsService.computeAdherenceMetrics(
+        patientId,
+        patientId,
+        new Date("2026-10-01T00:00:00Z"),
+        new Date("2026-10-07T23:59:59Z"),
+      );
+
+      expect(result.metrics.totalScheduled).toBe(0);
+      expect(result.metrics.confirmationRate).toBe(1.0);
+      expect(result.metrics.confirmedCount).toBe(0);
+      expect(result.metrics.unconfirmedCount).toBe(0);
+      expect(result.metrics.trend).toBe("STABLE");
+    });
+
+    it("does not penalize confirmation rate for future upcoming scheduled doses", async () => {
+      const pastTaken = {
+        status: "TAKEN",
+        scheduledAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        events: [],
+      };
+      const futurePending = {
+        status: "PENDING",
+        scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // tomorrow
+        events: [],
+      };
+
+      mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([pastTaken, futurePending]);
+
+      const result = await AdherenceAnalyticsService.computeAdherenceMetrics(
+        patientId,
+        patientId,
+        new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+      );
+
+      // Only the past dose is due, so 1/1 = 100% confirmation rate
+      expect(result.metrics.totalScheduled).toBe(2);
+      expect(result.metrics.dueScheduledCount).toBe(1);
+      expect(result.metrics.upcomingCount).toBe(1);
+      expect(result.metrics.confirmedCount).toBe(1);
+      expect(result.metrics.confirmationRate).toBe(1.0);
+    });
+
+    it("correctly aggregates multiple simultaneous medications (Ahmed's 5 doses at 18:00)", async () => {
+      const scheduledTime = new Date("2026-10-20T18:00:00Z");
+      const doses = [
+        { status: "TAKEN", scheduledAt: scheduledTime, resolvedAt: new Date("2026-10-20T18:05:00Z"), events: [] },
+        { status: "TAKEN", scheduledAt: scheduledTime, resolvedAt: new Date("2026-10-20T18:05:00Z"), events: [] },
+        { status: "TAKEN", scheduledAt: scheduledTime, resolvedAt: new Date("2026-10-20T18:05:00Z"), events: [] },
+        { status: "MISSED", scheduledAt: scheduledTime, events: [] },
+        { status: "MISSED", scheduledAt: scheduledTime, events: [] },
+      ];
+
+      mockPrisma.scheduledDose.findMany.mockResolvedValueOnce(doses);
+
+      const result = await AdherenceAnalyticsService.computeAdherenceMetrics(
+        patientId,
+        patientId,
+        new Date("2026-10-20T00:00:00Z"),
+        new Date("2026-10-20T23:59:59Z"),
+      );
+
+      expect(result.metrics.totalScheduled).toBe(5);
+      expect(result.metrics.timeOfDay.evening.scheduled).toBe(5);
+      expect(result.metrics.timeOfDay.evening.confirmed).toBe(3);
+      expect(result.metrics.timeOfDay.evening.missed).toBe(2);
+      expect(result.metrics.timeOfDay.evening.confirmationRate).toBe(0.6);
+    });
+
     it("rejects unauthorized access with ForbiddenError", async () => {
       mockPrisma.caregiverAccess.findUnique.mockResolvedValueOnce(null);
 
@@ -285,6 +433,31 @@ describe("Adherence Analytics & AI Summaries", () => {
       expect(trendPattern).toBeDefined();
       expect(trendPattern?.severity).toBe("MODERATE");
     });
+
+    it("handles empty doses array cleanly without flagging false patterns", () => {
+      const { patterns, riskAssessment } = AdherenceAnalyticsService.detectPatterns(baseMetrics, []);
+      expect(patterns).toHaveLength(0);
+      expect(riskAssessment.level).toBe("STABLE");
+      expect(riskAssessment.reasons[0]).toContain("No scheduled doses were recorded");
+    });
+
+    it("detects multiple non-consecutive missed doses when interspersed with taken doses", () => {
+      const doses = [
+        { status: "MISSED" },
+        { status: "TAKEN" },
+        { status: "MISSED" },
+        { status: "TAKEN" },
+      ];
+
+      const metrics = { ...baseMetrics, missedCount: 2 };
+      const { patterns, riskAssessment } = AdherenceAnalyticsService.detectPatterns(metrics, doses);
+
+      const missedPattern = patterns.find((p) => p.type === "REPEATED_MISSED_DOSES");
+      expect(missedPattern).toBeDefined();
+      expect(missedPattern?.severity).toBe("MODERATE");
+      expect(missedPattern?.description).toContain("Multiple missed doses detected");
+      expect(riskAssessment.reasons.some((r) => r.includes("2 missed doses in the observation window"))).toBe(true);
+    });
   });
 
   describe("AdherenceAnalyticsService.synthesizeNarrative", () => {
@@ -385,6 +558,72 @@ describe("Adherence Analytics & AI Summaries", () => {
         where: { patientId },
         orderBy: { createdAt: "desc" },
       });
+    });
+  });
+
+  describe("AdherenceAnalyticsService.getAdherenceHistory", () => {
+    it("returns chronological doses with observational results and medication details", async () => {
+      const mockDoses = [
+        {
+          id: "dose-101",
+          scheduleId: "sched-101",
+          scheduledAt: new Date("2026-10-20T08:00:00Z"),
+          status: "TAKEN",
+          resolvedAt: new Date("2026-10-20T08:04:00Z"),
+          schedule: {
+            medication: {
+              id: "med-1",
+              name: "Metformin",
+              dosageText: "500mg",
+              route: "ORAL",
+            },
+          },
+          events: [{ note: "Taken with breakfast" }],
+        },
+        {
+          id: "dose-102",
+          scheduleId: "sched-101",
+          scheduledAt: new Date("2026-10-20T18:00:00Z"),
+          status: "MISSED",
+          resolvedAt: null,
+          schedule: {
+            medication: {
+              id: "med-1",
+              name: "Metformin",
+              dosageText: "500mg",
+              route: "ORAL",
+            },
+          },
+          events: [],
+        },
+      ];
+
+      mockPrisma.scheduledDose.findMany.mockResolvedValueOnce(mockDoses);
+
+      const history = await AdherenceAnalyticsService.getAdherenceHistory(
+        patientId,
+        patientId,
+        { limit: 50 },
+      );
+
+      expect(history).toHaveLength(2);
+      expect(history[0].doseId).toBe("dose-101");
+      expect(history[0].adherenceResult).toBe("ON_TIME");
+      expect(history[0].delayMinutes).toBe(4);
+      expect(history[0].medication.name).toBe("Metformin");
+      expect(history[0].note).toBe("Taken with breakfast");
+
+      expect(history[1].doseId).toBe("dose-102");
+      expect(history[1].adherenceResult).toBe("MISSED");
+      expect(history[1].delayMinutes).toBeNull();
+    });
+
+    it("rejects unauthorized access with ForbiddenError", async () => {
+      mockPrisma.caregiverAccess.findUnique.mockResolvedValueOnce(null);
+
+      await expect(
+        AdherenceAnalyticsService.getAdherenceHistory(unauthorizedId, patientId),
+      ).rejects.toThrow(ForbiddenError);
     });
   });
 
@@ -511,6 +750,69 @@ describe("Adherence Analytics & AI Summaries", () => {
           .post(`/adherence/${patientId}/analyze`)
           .set("Authorization", "Bearer valid-token")
           .send({});
+
+        expect(res.status).toBe(403);
+      });
+    });
+
+    describe("GET /adherence/:patientId/history", () => {
+      it("requires bearer token (401)", async () => {
+        const res = await request(app).get(`/adherence/${patientId}/history`);
+        expect(res.status).toBe(401);
+      });
+
+      it("rejects non-uuid patientId with 400", async () => {
+        const res = await request(app)
+          .get("/adherence/invalid-uuid/history")
+          .set("Authorization", "Bearer valid-token");
+        expect(res.status).toBe(400);
+      });
+
+      it("returns adherence history items successfully (200)", async () => {
+        const mockDoses = [
+          {
+            id: "dose-201",
+            scheduleId: "sched-201",
+            scheduledAt: new Date("2026-10-21T08:00:00Z"),
+            status: "TAKEN",
+            resolvedAt: new Date("2026-10-21T08:25:00Z"), // 25 min late
+            schedule: {
+              medication: {
+                id: "med-2",
+                name: "Amlodipine",
+                dosageText: "5mg",
+                route: "ORAL",
+              },
+            },
+            events: [],
+          },
+        ];
+
+        mockPrisma.scheduledDose.findMany.mockResolvedValueOnce(mockDoses);
+
+        const res = await request(app)
+          .get(`/adherence/${patientId}/history?limit=10`)
+          .set("Authorization", "Bearer valid-token");
+
+        expect(res.status).toBe(200);
+        expect(res.body.patientId).toBe(patientId);
+        expect(res.body.count).toBe(1);
+        expect(res.body.history[0].doseId).toBe("dose-201");
+        expect(res.body.history[0].adherenceResult).toBe("LATE");
+        expect(res.body.history[0].delayMinutes).toBe(25);
+        expect(res.body.history[0].medication.name).toBe("Amlodipine");
+      });
+
+      it("rejects unauthorized access with 403", async () => {
+        mockGetUser.mockResolvedValueOnce({
+          data: { user: { id: unauthorizedId, email: "unauthorized@nexpill.test" } },
+          error: null,
+        });
+        mockPrisma.caregiverAccess.findUnique.mockResolvedValueOnce(null);
+
+        const res = await request(app)
+          .get(`/adherence/${patientId}/history`)
+          .set("Authorization", "Bearer valid-token");
 
         expect(res.status).toBe(403);
       });

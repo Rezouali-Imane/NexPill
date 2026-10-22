@@ -2,6 +2,7 @@ import type {
   AdherenceAnalysis,
   AnalysisGenerator,
   AnalysisKind,
+  DoseStatus,
   Prisma,
   RiskLevel,
 } from "@prisma/client";
@@ -24,6 +25,8 @@ export interface TimeOfDayMetrics {
 
 export interface AdherenceMetrics {
   totalScheduled: number;
+  dueScheduledCount: number;
+  upcomingCount: number;
   confirmedCount: number;
   unconfirmedCount: number;
   missedCount: number;
@@ -33,6 +36,33 @@ export interface AdherenceMetrics {
   averageDelayMinutes: number;
   trend: "IMPROVING" | "STABLE" | "DETERIORATING";
   timeOfDay: Record<TimeOfDayBucket, TimeOfDayMetrics>;
+}
+
+export type AdherenceResultStatus =
+  | "ON_TIME"
+  | "LATE"
+  | "UNCONFIRMED"
+  | "MISSED"
+  | "SKIPPED"
+  | "UNABLE_TO_TAKE"
+  | "UPCOMING";
+
+export interface AdherenceHistoryItem {
+  doseId: string;
+  scheduleId: string;
+  medication: {
+    id?: string;
+    name: string;
+    dosage?: string | null;
+    route?: string | null;
+  };
+  scheduledAt: Date;
+  timeOfDay: TimeOfDayBucket;
+  status: DoseStatus;
+  adherenceResult: AdherenceResultStatus;
+  delayMinutes: number | null;
+  confirmedAt: Date | null;
+  note: string | null;
 }
 
 export interface AdherencePattern {
@@ -83,6 +113,56 @@ export class AdherenceAnalyticsService {
   }
 
   /**
+   * Evaluates exact observational outcome and latency for a scheduled dose event.
+   */
+  static determineAdherenceResult(
+    status: DoseStatus,
+    scheduledAt: Date,
+    resolvedAt?: Date | null,
+    eventOccurredAt?: Date | null,
+    now: Date = new Date(),
+  ): {
+    adherenceResult: AdherenceResultStatus;
+    delayMinutes: number | null;
+    confirmedAt: Date | null;
+  } {
+    if (status === "TAKEN") {
+      const confirmedAt = resolvedAt ?? eventOccurredAt ?? null;
+      let delayMinutes = 0;
+      if (confirmedAt) {
+        delayMinutes = Math.max(
+          0,
+          Math.round((new Date(confirmedAt).getTime() - scheduledAt.getTime()) / (60 * 1000)),
+        );
+      }
+      return {
+        adherenceResult: delayMinutes >= 15 ? "LATE" : "ON_TIME",
+        delayMinutes,
+        confirmedAt: confirmedAt ? new Date(confirmedAt) : null,
+      };
+    }
+
+    if (status === "SKIPPED") {
+      return { adherenceResult: "SKIPPED", delayMinutes: null, confirmedAt: null };
+    }
+
+    if (status === "MISSED") {
+      return { adherenceResult: "MISSED", delayMinutes: null, confirmedAt: null };
+    }
+
+    if (status === "UNABLE_TO_TAKE") {
+      return { adherenceResult: "UNABLE_TO_TAKE", delayMinutes: null, confirmedAt: null };
+    }
+
+    // Status is PENDING
+    if (scheduledAt.getTime() > now.getTime()) {
+      return { adherenceResult: "UPCOMING", delayMinutes: null, confirmedAt: null };
+    }
+
+    return { adherenceResult: "UNCONFIRMED", delayMinutes: null, confirmedAt: null };
+  }
+
+  /**
    * Fetches dose history and computes deterministic adherence metrics for a patient.
    */
   static async computeAdherenceMetrics(
@@ -117,6 +197,7 @@ export class AdherenceAnalyticsService {
       orderBy: { scheduledAt: "asc" },
     });
 
+    const now = new Date();
     const initBucket = (): TimeOfDayMetrics => ({
       scheduled: 0,
       confirmed: 0,
@@ -144,10 +225,20 @@ export class AdherenceAnalyticsService {
     let missedCount = 0;
     let skippedCount = 0;
     let delayedCount = 0;
+    let dueScheduledCount = 0;
+    let upcomingCount = 0;
     const allDelays: number[] = [];
 
     for (const dose of doses) {
       const bucket = this.getTimeOfDay(dose.scheduledAt);
+      const isPastOrDue =
+        dose.scheduledAt.getTime() <= now.getTime() || dose.status !== "PENDING";
+
+      if (isPastOrDue) {
+        dueScheduledCount++;
+      } else {
+        upcomingCount++;
+      }
       timeOfDay[bucket].scheduled++;
 
       if (dose.status === "TAKEN") {
@@ -178,18 +269,29 @@ export class AdherenceAnalyticsService {
         skippedCount++;
       } else {
         // PENDING past scheduled time or UNABLE_TO_TAKE
-        timeOfDay[bucket].unconfirmed++;
+        if (isPastOrDue) {
+          timeOfDay[bucket].unconfirmed++;
+        }
       }
     }
 
-    const unconfirmedCount = doses.length - confirmedCount - skippedCount;
+    // Unconfirmed count represents due doses that were not confirmed or skipped
+    const unconfirmedCount =
+      dueScheduledCount > 0
+        ? Math.max(0, dueScheduledCount - confirmedCount - skippedCount)
+        : doses.length > 0
+          ? Math.max(0, doses.length - confirmedCount - skippedCount)
+          : 0;
+
+    // Confirmation rate evaluated against due doses to prevent future scheduled doses from depressing the score
+    const rateDenominator = dueScheduledCount > 0 ? dueScheduledCount : doses.length;
     const confirmationRate =
-      doses.length > 0 ? Number((confirmedCount / doses.length).toFixed(3)) : 1;
+      rateDenominator > 0 ? Number((confirmedCount / rateDenominator).toFixed(3)) : 1;
 
     // Calculate rates and averages per bucket
     for (const key of Object.keys(timeOfDay) as TimeOfDayBucket[]) {
       const b = timeOfDay[key];
-      b.unconfirmed = b.scheduled - b.confirmed - b.missed;
+      b.unconfirmed = Math.max(0, b.scheduled - b.confirmed - b.missed);
       b.confirmationRate =
         b.scheduled > 0 ? Number((b.confirmed / b.scheduled).toFixed(3)) : 1;
       const delays = bucketDelays[key];
@@ -206,15 +308,24 @@ export class AdherenceAnalyticsService {
 
     // Trend calculation (compare first half of period to second half)
     let trend: "IMPROVING" | "STABLE" | "DETERIORATING" = "STABLE";
-    if (doses.length >= 6) {
-      const mid = Math.floor(doses.length / 2);
-      const firstHalf = doses.slice(0, mid);
-      const secondHalf = doses.slice(mid);
+    const dueDoses = doses.filter(
+      (d) => d.scheduledAt.getTime() <= now.getTime() || d.status !== "PENDING",
+    );
+    const trendTarget = dueDoses.length >= 6 ? dueDoses : doses;
+
+    if (trendTarget.length >= 6) {
+      const mid = Math.floor(trendTarget.length / 2);
+      const firstHalf = trendTarget.slice(0, mid);
+      const secondHalf = trendTarget.slice(mid);
 
       const firstRate =
-        firstHalf.filter((d) => d.status === "TAKEN").length / firstHalf.length;
+        firstHalf.length > 0
+          ? firstHalf.filter((d) => d.status === "TAKEN").length / firstHalf.length
+          : 1;
       const secondRate =
-        secondHalf.filter((d) => d.status === "TAKEN").length / secondHalf.length;
+        secondHalf.length > 0
+          ? secondHalf.filter((d) => d.status === "TAKEN").length / secondHalf.length
+          : 1;
 
       if (secondRate <= firstRate - 0.15) {
         trend = "DETERIORATING";
@@ -225,6 +336,8 @@ export class AdherenceAnalyticsService {
 
     const metrics: AdherenceMetrics = {
       totalScheduled: doses.length,
+      dueScheduledCount,
+      upcomingCount,
       confirmedCount,
       unconfirmedCount,
       missedCount,
@@ -246,6 +359,17 @@ export class AdherenceAnalyticsService {
     metrics: AdherenceMetrics,
     doses: unknown[],
   ): { patterns: AdherencePattern[]; riskAssessment: { level: RiskLevel; score: number; reasons: string[] } } {
+    if (doses.length === 0) {
+      return {
+        patterns: [],
+        riskAssessment: {
+          level: "STABLE",
+          score: 0.0,
+          reasons: ["No scheduled doses were recorded in this observation period."],
+        },
+      };
+    }
+
     const patterns: AdherencePattern[] = [];
     const reasons: string[] = [];
     let riskScore = 0.0;
@@ -253,9 +377,14 @@ export class AdherenceAnalyticsService {
     // 1. Repeated Missed Doses Pattern
     let consecutiveMissed = 0;
     let maxConsecutiveMissed = 0;
+    const nowTime = Date.now();
 
-    for (const dose of doses as Array<{ status: string }>) {
-      if (dose.status === "MISSED") {
+    for (const dose of doses as Array<{ status: string; scheduledAt?: Date }>) {
+      const isUnconfirmedOrMissed =
+        dose.status === "MISSED" ||
+        (dose.status === "PENDING" && (!dose.scheduledAt || dose.scheduledAt.getTime() <= nowTime));
+
+      if (isUnconfirmedOrMissed) {
         consecutiveMissed++;
         if (consecutiveMissed > maxConsecutiveMissed) {
           maxConsecutiveMissed = consecutiveMissed;
@@ -528,6 +657,84 @@ export class AdherenceAnalyticsService {
     return prisma.adherenceAnalysis.findFirst({
       where: { patientId: validPatientId },
       orderBy: { createdAt: "desc" },
+    });
+  }
+
+  /**
+   * Retrieves standardized chronological adherence history with observational outcomes.
+   * Provides consistent data for frontend views and AI agent tools.
+   */
+  static async getAdherenceHistory(
+    actorUserId: string,
+    patientId: string,
+    options: {
+      startDate?: Date | string;
+      endDate?: Date | string;
+      limit?: number;
+    } = {},
+  ): Promise<AdherenceHistoryItem[]> {
+    const validPatientId = validateUuid(patientId, "patientId");
+    await AccessControlService.assertPatientAccess(actorUserId, validPatientId, "read");
+
+    const where: Prisma.ScheduledDoseWhereInput = {
+      patientId: validPatientId,
+      status: { not: "CANCELLED" },
+    };
+
+    if (options.startDate || options.endDate) {
+      where.scheduledAt = {};
+      if (options.startDate) {
+        where.scheduledAt.gte = parseDate(options.startDate, "startDate");
+      }
+      if (options.endDate) {
+        where.scheduledAt.lte = parseDate(options.endDate, "endDate");
+      }
+    }
+
+    const doses = await prisma.scheduledDose.findMany({
+      where,
+      include: {
+        schedule: {
+          include: {
+            medication: true,
+          },
+        },
+        events: {
+          orderBy: { recordedAt: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { scheduledAt: "desc" },
+      take: options.limit ? Math.min(Math.max(1, options.limit), 500) : 100,
+    });
+
+    const now = new Date();
+    return doses.map((dose) => {
+      const evaluation = this.determineAdherenceResult(
+        dose.status,
+        dose.scheduledAt,
+        dose.resolvedAt,
+        dose.events[0]?.occurredAt,
+        now,
+      );
+
+      return {
+        doseId: dose.id,
+        scheduleId: dose.scheduleId,
+        medication: {
+          id: dose.schedule?.medication?.id,
+          name: dose.schedule?.medication?.name ?? "Unknown Medication",
+          dosage: dose.schedule?.medication?.dosageText ?? null,
+          route: dose.schedule?.medication?.route ?? null,
+        },
+        scheduledAt: dose.scheduledAt,
+        timeOfDay: this.getTimeOfDay(dose.scheduledAt),
+        status: dose.status,
+        adherenceResult: evaluation.adherenceResult,
+        delayMinutes: evaluation.delayMinutes,
+        confirmedAt: evaluation.confirmedAt,
+        note: dose.events[0]?.note ?? null,
+      };
     });
   }
 }

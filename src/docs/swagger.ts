@@ -1566,5 +1566,127 @@ export const openApiSpec = {
         },
       },
     },
+    "/adherence/{patientId}/history": {
+      get: {
+        tags: ["Adherence"],
+        summary: "Get Patient Adherence History",
+        description:
+          "Retrieves standardized chronological adherence history with observational outcomes (ON_TIME, LATE, UNCONFIRMED, MISSED, SKIPPED, UPCOMING) and confirmation latency.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: "patientId",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Target patient UUID",
+          },
+          {
+            name: "startDate",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "date-time" },
+            description: "Start of history filter range",
+          },
+          {
+            name: "endDate",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "date-time" },
+            description: "End of history filter range",
+          },
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", default: 100 },
+            description: "Maximum history items to return (up to 500)",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Patient adherence history items",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    patientId: { type: "string", format: "uuid" },
+                    count: { type: "integer" },
+                    history: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          doseId: { type: "string", format: "uuid" },
+                          scheduleId: { type: "string", format: "uuid" },
+                          medication: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string", format: "uuid" },
+                              name: { type: "string" },
+                              dosage: { type: "string", nullable: true },
+                              route: { type: "string", nullable: true },
+                            },
+                          },
+                          scheduledAt: { type: "string", format: "date-time" },
+                          timeOfDay: {
+                            type: "string",
+                            enum: ["morning", "afternoon", "evening", "night"],
+                          },
+                          status: {
+                            type: "string",
+                            enum: ["PENDING", "TAKEN", "SKIPPED", "MISSED", "UNABLE_TO_TAKE"],
+                          },
+                          adherenceResult: {
+                            type: "string",
+                            enum: [
+                              "ON_TIME",
+                              "LATE",
+                              "UNCONFIRMED",
+                              "MISSED",
+                              "SKIPPED",
+                              "UNABLE_TO_TAKE",
+                              "UPCOMING",
+                            ],
+                          },
+                          delayMinutes: { type: "integer", nullable: true },
+                          confirmedAt: { type: "string", format: "date-time", nullable: true },
+                          note: { type: "string", nullable: true },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: {
+            description: "Invalid input or UUID format",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: {
+            description: "Missing or invalid authentication token",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Forbidden: Actor lacks authorization to view this patient",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
   },
 };
