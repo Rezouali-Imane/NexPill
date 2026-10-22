@@ -9,6 +9,7 @@ import { prisma } from "../db/prisma";
 import { BadRequestError } from "../errors";
 import { parseDate, validateUuid } from "../utils/validation";
 import { AccessControlService } from "./access-control.service";
+import { AiSummaryService } from "./ai-summary.service";
 
 export type TimeOfDayBucket = "morning" | "afternoon" | "evening" | "night";
 
@@ -455,11 +456,31 @@ export class AdherenceAnalyticsService {
     );
 
     const { patterns, riskAssessment } = this.detectPatterns(metrics, doses);
-    const { summaryText, suggestedFollowUp } = this.synthesizeNarrative(
+    const fallbackNarrative = this.synthesizeNarrative(
       metrics,
       patterns,
       riskAssessment.level,
     );
+
+    let summaryText = fallbackNarrative.summaryText;
+    let suggestedFollowUp = fallbackNarrative.suggestedFollowUp;
+    let generator: AnalysisGenerator = options.generator ?? "AI_MODEL";
+    let modelName = "rules-deterministic-v1";
+    let promptVersion: string | undefined = undefined;
+
+    if (generator === "AI_MODEL") {
+      const aiResult = await AiSummaryService.generateSummary(
+        metrics,
+        patterns,
+        riskAssessment.level,
+        fallbackNarrative,
+      );
+      summaryText = aiResult.summaryText;
+      suggestedFollowUp = aiResult.suggestedFollowUp;
+      generator = aiResult.generator;
+      modelName = aiResult.modelName;
+      promptVersion = aiResult.promptVersion;
+    }
 
     // Persist to AdherenceAnalysis database model
     const analysis = await prisma.adherenceAnalysis.create({
@@ -476,9 +497,9 @@ export class AdherenceAnalyticsService {
           patterns,
         } as unknown as Prisma.InputJsonValue,
         summaryText,
-        generator: options.generator ?? "AI_MODEL",
-        modelName: "nexpill-adherence-ml-v1",
-        promptVersion: "1.0",
+        generator,
+        modelName,
+        promptVersion,
       },
     });
 
