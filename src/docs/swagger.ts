@@ -22,6 +22,7 @@ export const openApiSpec = {
     { name: "Schedules", description: "Dosage recurrence schedules and caregiver reminder rules" },
     { name: "Doses", description: "Medication adherence tracking (Taken, Skipped, Unable to Take) and scheduled dose lifecycle" },
     { name: "Notifications", description: "Reminder notifications dispatch and delivery endpoint tracking" },
+    { name: "Alerts", description: "Caregiver escalation alerts and adherence monitoring" },
   ],
   components: {
     securitySchemes: {
@@ -295,6 +296,30 @@ export const openApiSpec = {
           deliveredAt: { type: "string", format: "date-time", nullable: true },
           attemptCount: { type: "integer" },
           dedupeKey: { type: "string" },
+        },
+      },
+      CaregiverAlert: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          patientId: { type: "string", format: "uuid" },
+          recipientId: { type: "string", format: "uuid" },
+          doseId: { type: "string", format: "uuid", nullable: true },
+          type: {
+            type: "string",
+            enum: ["DOSE_LATE", "DOSE_MISSED", "REPEATED_MISSES", "RISK_HIGH", "SAFETY_WARNING"],
+            example: "DOSE_MISSED",
+          },
+          status: {
+            type: "string",
+            enum: ["OPEN", "ACKNOWLEDGED", "RESOLVED"],
+            example: "OPEN",
+          },
+          message: { type: "string", example: "Missed dose: Lisinopril scheduled for 08:00 was not confirmed." },
+          reason: { type: "object" },
+          createdAt: { type: "string", format: "date-time" },
+          acknowledgedAt: { type: "string", format: "date-time", nullable: true },
+          resolvedAt: { type: "string", format: "date-time", nullable: true },
         },
       },
       NotificationEndpoint: {
@@ -1147,6 +1172,143 @@ export const openApiSpec = {
                     scheduledCount: { type: "integer" },
                     notificationIds: { type: "array", items: { type: "string" } },
                   },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/alerts": {
+      get: {
+        tags: ["Alerts"],
+        summary: "List Caregiver Alerts",
+        description: "Lists alerts for the authenticated caregiver or patient, filterable by status, type, and dates.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "patientId", in: "query", schema: { type: "string", format: "uuid" } },
+          { name: "status", in: "query", schema: { type: "string", enum: ["OPEN", "ACKNOWLEDGED", "RESOLVED"] } },
+          { name: "type", in: "query", schema: { type: "string", enum: ["DOSE_LATE", "DOSE_MISSED", "REPEATED_MISSES", "RISK_HIGH", "SAFETY_WARNING"] } },
+          { name: "startDate", in: "query", schema: { type: "string", format: "date" } },
+          { name: "endDate", in: "query", schema: { type: "string", format: "date" } },
+        ],
+        responses: {
+          200: {
+            description: "List of caregiver alerts",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    alerts: { type: "array", items: { $ref: "#/components/schemas/CaregiverAlert" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/alerts/summary": {
+      get: {
+        tags: ["Alerts"],
+        summary: "Caregiver Alerts Summary",
+        description: "Returns count aggregates of alerts grouped by status and type.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "patientId", in: "query", schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          200: {
+            description: "Alerts summary counts",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    summary: {
+                      type: "object",
+                      properties: {
+                        total: { type: "integer" },
+                        open: { type: "integer" },
+                        acknowledged: { type: "integer" },
+                        resolved: { type: "integer" },
+                        byType: { type: "object" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/alerts/{id}": {
+      get: {
+        tags: ["Alerts"],
+        summary: "Get Alert by ID",
+        description: "Retrieves details of a single caregiver alert.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          200: {
+            description: "Caregiver alert details",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { alert: { $ref: "#/components/schemas/CaregiverAlert" } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/alerts/{id}/acknowledge": {
+      patch: {
+        tags: ["Alerts"],
+        summary: "Acknowledge Caregiver Alert",
+        description: "Transitions alert status from OPEN to ACKNOWLEDGED.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          200: {
+            description: "Acknowledged alert",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { alert: { $ref: "#/components/schemas/CaregiverAlert" } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/alerts/{id}/resolve": {
+      patch: {
+        tags: ["Alerts"],
+        summary: "Resolve Caregiver Alert",
+        description: "Transitions alert status to RESOLVED.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          200: {
+            description: "Resolved alert",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { alert: { $ref: "#/components/schemas/CaregiverAlert" } },
                 },
               },
             },

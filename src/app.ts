@@ -13,6 +13,7 @@ import { doseRouter } from "./routes/doses";
 import { caregiverAccessRouter } from "./routes/caregiver-access";
 import { mcpRouter } from "./routes/mcp";
 import { notificationRouter } from "./routes/notifications";
+import { alertRouter } from "./routes/alerts";
 
 export const app = express();
 
@@ -38,5 +39,6 @@ app.use("/doses", doseRouter);
 app.use("/caregiver-access", caregiverAccessRouter);
 app.use("/mcp", mcpRouter);
 app.use("/notifications", notificationRouter);
+app.use("/alerts", alertRouter);
 app.use(notFound);
 app.use(errorHandler);
