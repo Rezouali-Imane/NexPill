@@ -23,6 +23,8 @@ vi.mock("../src/db/prisma", () => ({ prisma: mockPrisma }));
 import { app } from "../src/app";
 import { createMedicalMcpServer } from "../src/mcp/medical-server";
 import { MedicationInformationService } from "../src/services/medication-information.service";
+import { AdherenceAnalyticsService } from "../src/services/adherence-analytics.service";
+import { ForbiddenError } from "../src/errors";
 
 describe("Medical MCP Server & Transport", () => {
   beforeEach(() => {
@@ -107,7 +109,7 @@ describe("Medical MCP Server & Transport", () => {
   });
 
   describe("MCP Tool Contract & Metadata", () => {
-    it("exposes lookup_medication_information with strict read-only and safety annotations", async () => {
+    it("exposes all registered medical and adherence agent tools with strict safety annotations", async () => {
       const server = createMedicalMcpServer("user-1");
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
       const client = new Client({ name: "test-client", version: "1.0.0" });
@@ -118,23 +120,28 @@ describe("Medical MCP Server & Transport", () => {
       ]);
 
       const result = await client.listTools();
-      expect(result.tools).toHaveLength(1);
+      expect(result.tools).toHaveLength(6);
 
-      const tool = result.tools[0]!;
-      expect(tool.name).toBe("lookup_medication_information");
-      expect(tool.description).toContain(
+      const toolNames = result.tools.map((t) => t.name);
+      expect(toolNames).toEqual([
+        "lookup_medication_information",
+        "list_medications",
+        "list_schedules",
+        "get_patient_adherence_history",
+        "detect_adherence_patterns",
+        "generate_adherence_summary",
+      ]);
+
+      const lookupTool = result.tools.find((t) => t.name === "lookup_medication_information")!;
+      expect(lookupTool.description).toContain(
         "Read-only medication name lookup against the public NIH RxNorm terminology service",
       );
-
-      // Verify read-only and idempotency annotations
-      expect(tool.annotations).toEqual({
+      expect(lookupTool.annotations).toEqual({
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
       });
-
-      // Verify input schema constraints
-      expect(tool.inputSchema).toMatchObject({
+      expect(lookupTool.inputSchema).toMatchObject({
         type: "object",
         properties: {
           medicationName: {
@@ -144,6 +151,22 @@ describe("Medical MCP Server & Transport", () => {
           },
         },
         required: ["medicationName"],
+      });
+
+      const patternTool = result.tools.find((t) => t.name === "detect_adherence_patterns")!;
+      expect(patternTool.description).toContain("Analyzes patient dose history");
+      expect(patternTool.annotations).toEqual({
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      });
+
+      const summaryTool = result.tools.find((t) => t.name === "generate_adherence_summary")!;
+      expect(summaryTool.description).toContain("Generates an explainable, structured adherence summary");
+      expect(summaryTool.annotations).toEqual({
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
       });
 
       await client.close();
@@ -219,6 +242,18 @@ describe("Medical MCP Server & Transport", () => {
         "expected string, received undefined",
       );
     });
+
+    it("rejects invalid patientId uuid on detect_adherence_patterns", async () => {
+      const res = await client.callTool({
+        name: "detect_adherence_patterns",
+        arguments: { patientId: "not-a-uuid" },
+      });
+
+      expect(res.isError).toBe(true);
+      expect((res.content[0] as { text: string }).text).toContain(
+        "Invalid UUID",
+      );
+    });
   });
 
   describe("MCP Tool Execution & Error Handling", () => {
@@ -290,6 +325,132 @@ describe("Medical MCP Server & Transport", () => {
       expect(response.isError).toBe(true);
       expect((response.content[0] as { text: string }).text).toBe(
         "Trusted medication information source is unavailable.",
+      );
+
+      await client.close();
+      await server.close();
+    });
+
+    it("executes detect_adherence_patterns and returns structured findings", async () => {
+      const server = createMedicalMcpServer("user-1");
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+
+      await Promise.all([
+        client.connect(clientTransport),
+        server.connect(serverTransport),
+      ]);
+
+      const mockMetrics = {
+        totalScheduled: 10,
+        confirmedCount: 9,
+        unconfirmedCount: 1,
+        missedCount: 1,
+        skippedCount: 0,
+        delayedCount: 0,
+        confirmationRate: 0.9,
+        averageDelayMinutes: 5,
+        trend: "STABLE" as const,
+        timeOfDay: {
+          morning: { scheduled: 5, confirmed: 5, unconfirmed: 0, missed: 0, confirmationRate: 1, averageDelayMinutes: 2 },
+          afternoon: { scheduled: 0, confirmed: 0, unconfirmed: 0, missed: 0, confirmationRate: 1, averageDelayMinutes: 0 },
+          evening: { scheduled: 5, confirmed: 4, unconfirmed: 1, missed: 1, confirmationRate: 0.8, averageDelayMinutes: 8 },
+          night: { scheduled: 0, confirmed: 0, unconfirmed: 0, missed: 0, confirmationRate: 1, averageDelayMinutes: 0 },
+        },
+      };
+
+      vi.spyOn(AdherenceAnalyticsService, "computeAdherenceMetrics").mockResolvedValueOnce({
+        metrics: mockMetrics,
+        doses: [],
+      });
+
+      vi.spyOn(AdherenceAnalyticsService, "detectPatterns").mockReturnValueOnce({
+        patterns: [],
+        riskAssessment: {
+          level: "STABLE",
+          score: 0.0,
+          reasons: ["Consistent on-time adherence."],
+        },
+      });
+
+      const response = await client.callTool({
+        name: "detect_adherence_patterns",
+        arguments: {
+          patientId: "a0000000-0000-4000-8000-000000000001",
+        },
+      });
+
+      expect(response.isError).toBeFalsy();
+      const data = JSON.parse((response.content[0] as { text: string }).text);
+      expect(data.patientId).toBe("a0000000-0000-4000-8000-000000000001");
+      expect(data.metrics.confirmationRate).toBe(0.9);
+      expect(data.riskAssessment.level).toBe("STABLE");
+
+      await client.close();
+      await server.close();
+    });
+
+    it("executes generate_adherence_summary and persists explainable report", async () => {
+      const server = createMedicalMcpServer("user-1");
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+
+      await Promise.all([
+        client.connect(clientTransport),
+        server.connect(serverTransport),
+      ]);
+
+      vi.spyOn(AdherenceAnalyticsService, "generateReport").mockResolvedValueOnce({
+        patientId: "a0000000-0000-4000-8000-000000000001",
+        period: { start: new Date("2026-10-01"), end: new Date("2026-10-08") },
+        metrics: {} as never,
+        patterns: [],
+        riskAssessment: { level: "STABLE", score: 0.0, reasons: [] },
+        suggestedFollowUp: "Continue standard monitoring.",
+        summaryText: "Patient adherence is 100%.",
+        analysisRecordId: "rec-1",
+      });
+
+      const response = await client.callTool({
+        name: "generate_adherence_summary",
+        arguments: {
+          patientId: "a0000000-0000-4000-8000-000000000001",
+        },
+      });
+
+      expect(response.isError).toBeFalsy();
+      const data = JSON.parse((response.content[0] as { text: string }).text);
+      expect(data.summaryText).toContain("Patient adherence is 100%");
+      expect(data.analysisRecordId).toBe("rec-1");
+
+      await client.close();
+      await server.close();
+    });
+
+    it("handles authorization errors safely through MCP protocol", async () => {
+      const server = createMedicalMcpServer("user-unauthorized");
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+
+      await Promise.all([
+        client.connect(clientTransport),
+        server.connect(serverTransport),
+      ]);
+
+      vi.spyOn(AdherenceAnalyticsService, "computeAdherenceMetrics").mockRejectedValueOnce(
+        new ForbiddenError("You are not allowed to view adherence records for this patient."),
+      );
+
+      const response = await client.callTool({
+        name: "detect_adherence_patterns",
+        arguments: {
+          patientId: "a0000000-0000-4000-8000-000000000001",
+        },
+      });
+
+      expect(response.isError).toBe(true);
+      expect((response.content[0] as { text: string }).text).toContain(
+        "You are not allowed to view adherence records for this patient.",
       );
 
       await client.close();
