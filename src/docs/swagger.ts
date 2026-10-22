@@ -1115,6 +1115,22 @@ export const openApiSpec = {
               },
             },
           },
+          400: {
+            description: "Invalid query filter parameters",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: {
+            description: "Missing or invalid authentication token",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
         },
       },
     },
@@ -1136,6 +1152,38 @@ export const openApiSpec = {
                   type: "object",
                   properties: { notification: { $ref: "#/components/schemas/Notification" } },
                 },
+              },
+            },
+          },
+          400: {
+            description: "Invalid notification UUID",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: {
+            description: "Missing or invalid authentication token",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Forbidden: You are not authorized to update this notification",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          404: {
+            description: "Notification not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
               },
             },
           },
@@ -1369,6 +1417,14 @@ export const openApiSpec = {
               },
             },
           },
+          401: {
+            description: "Missing or invalid authentication token",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
         },
       },
       post: {
@@ -1400,6 +1456,22 @@ export const openApiSpec = {
                   type: "object",
                   properties: { endpoint: { $ref: "#/components/schemas/NotificationEndpoint" } },
                 },
+              },
+            },
+          },
+          400: {
+            description: "Invalid channel enum or missing address",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: {
+            description: "Missing or invalid authentication token",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
               },
             },
           },
