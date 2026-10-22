@@ -1,11 +1,14 @@
 import { prisma } from "../db/prisma";
 import { emitDoseUpdate } from "../realtime/dose-events";
+import { AlertService } from "../services/alert.service";
 
 export interface MissedDoseJobResult {
   runAt: Date;
   missedCount: number;
   processedDoseIds: string[];
   alertsCreatedCount: number;
+  repeatedMissesCount?: number;
+  lateAlertsCount?: number;
 }
 
 export class MissedDoseJobService {
@@ -43,10 +46,12 @@ export class MissedDoseJobService {
         processedDoseIds: [],
         alertsCreatedCount: 0,
       };
+  
     }
 
     const processedDoseIds: string[] = [];
     let alertsCreatedCount = 0;
+    let repeatedMissesCount = 0;
 
     for (const dose of overdueDoses) {
       try {
@@ -138,6 +143,33 @@ export class MissedDoseJobService {
             }
           }
 
+          // 4. Resolve any open DOSE_LATE alert for this dose
+          if (typeof tx.caregiverAlert?.updateMany === "function") {
+            await tx.caregiverAlert.updateMany({
+              where: {
+                doseId: dose.id,
+                type: "DOSE_LATE",
+                status: "OPEN",
+              },
+              data: {
+                status: "RESOLVED",
+                resolvedAt: referenceTime,
+              },
+            });
+          }
+
+          // 5. Evaluate repeated misses escalation rule
+          const repeatedEscalated = await AlertService.checkRepeatedMissesEscalation(
+            tx,
+            dose.patientId,
+            dose.id,
+            referenceTime,
+          );
+  
+          if (repeatedEscalated) {
+            repeatedMissesCount++;
+          }
+
           return true;
         });
 
@@ -163,7 +195,114 @@ export class MissedDoseJobService {
       missedCount: processedDoseIds.length,
       processedDoseIds,
       alertsCreatedCount,
+      repeatedMissesCount,
     };
+
+  }
+
+  /**
+   * Scans for PENDING scheduled doses that are overdue for caregiver late alert escalation
+   * (now >= scheduledAt + caregiverAlertAfterMin) but have not yet passed missedDeadlineAt.
+   */
+  static async detectAndEscalateLateDoses(
+    referenceTime: Date = new Date(),
+    batchLimit = 500,
+  ): Promise<number> {
+    const rawPending = await prisma.scheduledDose.findMany({
+      where: {
+        status: "PENDING",
+        missedDeadlineAt: { gt: referenceTime },
+      },
+      include: {
+        schedule: {
+          include: {
+            medication: true,
+            reminder: true,
+          },
+        },
+      },
+      take: batchLimit,
+      orderBy: { scheduledAt: "asc" },
+    });
+
+    const pendingDoses = Array.isArray(rawPending) ? rawPending : [];
+    let lateAlertsCreated = 0;
+
+    for (const dose of pendingDoses) {
+      if (!dose.schedule.reminder?.notifyCaregivers) {
+        continue;
+      }
+
+      const alertAfterMin = dose.schedule.reminder.caregiverAlertAfterMin ?? 30;
+      const lateEscalationTime = new Date(
+        dose.scheduledAt.getTime() + alertAfterMin * 60 * 1000,
+      );
+
+      if (referenceTime >= lateEscalationTime) {
+        const rawCaregivers = await prisma.caregiverAccess.findMany({
+          where: {
+            patientId: dose.patientId,
+            status: "ACTIVE",
+            canReceiveAlerts: true,
+          },
+        });
+
+        const caregivers = Array.isArray(rawCaregivers) ? rawCaregivers : [];
+
+        for (const caregiver of caregivers) {
+          if (!caregiver.caregiverId) {
+            continue;
+          }
+
+          const dedupeKey = `late-dose-${dose.id}-${caregiver.caregiverId}`;
+          const alert = await prisma.caregiverAlert.upsert({
+            where: { dedupeKey },
+            create: {
+              patientId: dose.patientId,
+              recipientId: caregiver.caregiverId,
+              doseId: dose.id,
+              type: "DOSE_LATE",
+              status: "OPEN",
+              message: `Late dose: "${dose.schedule.medication.name}" (${dose.schedule.doseLabel}) scheduled for ${dose.scheduledAt.toISOString()} is overdue.`,
+              reason: {
+                doseId: dose.id,
+                scheduleId: dose.scheduleId,
+                medicationId: dose.schedule.medicationId,
+                medicationName: dose.schedule.medication.name,
+                doseLabel: dose.schedule.doseLabel,
+                scheduledAt: dose.scheduledAt.toISOString(),
+                lateAfterMin: dose.schedule.reminder.lateAfterMin,
+                caregiverAlertAfterMin: alertAfterMin,
+              },
+              dedupeKey,
+            },
+            update: {},
+          });
+
+          const notifDedupeKey = `alert-notif-${alert.id}-IN_APP`;
+          await prisma.notification.upsert({
+            where: { dedupeKey: notifDedupeKey },
+            create: {
+              recipientId: caregiver.caregiverId,
+              patientId: dose.patientId,
+              alertId: alert.id,
+              doseId: dose.id,
+              kind: "CAREGIVER_ALERT",
+              channel: "IN_APP",
+              status: "SCHEDULED",
+              scheduledFor: referenceTime,
+              dedupeKey: notifDedupeKey,
+            },
+            update: {},
+          });
+
+          lateAlertsCreated++;
+        }
+      }
+    }
+
+    return lateAlertsCreated;
+
   }
 }
 
@@ -181,6 +320,9 @@ export function startMissedDoseScheduler(intervalMs = 60000): void {
   MissedDoseJobService.detectAndMarkMissedDoses().catch((err) => {
     console.error("[MissedDoseJob] Error during startup detection:", err);
   });
+  MissedDoseJobService.detectAndEscalateLateDoses().catch((err) => {
+    console.error("[MissedDoseJob] Error during startup late detection:", err);
+  });
 
   missedDoseTimer = setInterval(async () => {
     try {
@@ -189,6 +331,11 @@ export function startMissedDoseScheduler(intervalMs = 60000): void {
         console.log(
           `[MissedDoseJob] Detected ${result.missedCount} missed doses. Created ${result.alertsCreatedCount} alerts.`,
         );
+      }
+      const lateCount = await MissedDoseJobService.detectAndEscalateLateDoses();
+      if (lateCount > 0) {
+        console.log(`[MissedDoseJob] Escalated ${lateCount} late dose caregiver alerts.`);
+
       }
     } catch (error) {
       console.error("[MissedDoseJob] Background execution error:", error);
