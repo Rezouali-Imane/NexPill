@@ -3,6 +3,7 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/require-auth";
 import { AdherenceAnalyticsService } from "../services/adherence-analytics.service";
 import { getParamString } from "../utils/validation";
+import { BadRequestError } from "../errors";
 
 export const adherenceRouter = Router();
 
@@ -85,13 +86,22 @@ adherenceRouter.get(
       const patientId = getParamString(req.params.patientId);
       const { startDate, endDate, limit } = req.query;
 
+      let parsedLimit: number | undefined;
+      if (limit !== undefined && limit !== "") {
+        const num = Number(limit);
+        if (!Number.isInteger(num) || num < 1) {
+          throw new BadRequestError("limit must be a positive integer.");
+        }
+        parsedLimit = num;
+      }
+
       const history = await AdherenceAnalyticsService.getAdherenceHistory(
         actorUserId,
         patientId,
         {
           startDate: typeof startDate === "string" ? startDate : undefined,
           endDate: typeof endDate === "string" ? endDate : undefined,
-          limit: limit ? Number(limit) : undefined,
+          limit: parsedLimit,
         },
       );
 

@@ -816,6 +816,76 @@ describe("Adherence Analytics & AI Summaries", () => {
 
         expect(res.status).toBe(403);
       });
+
+      it("filters history by startDate and endDate query parameters", async () => {
+        mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([]);
+
+        const res = await request(app)
+          .get(`/adherence/${patientId}/history?startDate=2026-10-01T00:00:00Z&endDate=2026-10-07T23:59:59Z`)
+          .set("Authorization", "Bearer valid-token");
+
+        expect(res.status).toBe(200);
+        expect(mockPrisma.scheduledDose.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              patientId,
+              scheduledAt: {
+                gte: new Date("2026-10-01T00:00:00Z"),
+                lte: new Date("2026-10-07T23:59:59Z"),
+              },
+            }),
+          }),
+        );
+      });
+
+      it("rejects invalid startDate with 400 Bad Request", async () => {
+        const res = await request(app)
+          .get(`/adherence/${patientId}/history?startDate=invalid-date`)
+          .set("Authorization", "Bearer valid-token");
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toContain("Invalid date format for startDate");
+      });
+
+      it("rejects invalid endDate with 400 Bad Request", async () => {
+        const res = await request(app)
+          .get(`/adherence/${patientId}/history?endDate=invalid-date`)
+          .set("Authorization", "Bearer valid-token");
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toContain("Invalid date format for endDate");
+      });
+
+      it("respects limit query parameter", async () => {
+        mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([]);
+
+        const res = await request(app)
+          .get(`/adherence/${patientId}/history?limit=5`)
+          .set("Authorization", "Bearer valid-token");
+
+        expect(res.status).toBe(200);
+        expect(mockPrisma.scheduledDose.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            take: 5,
+          }),
+        );
+      });
+
+      it("rejects non-integer or non-positive limit with 400 Bad Request", async () => {
+        const res1 = await request(app)
+          .get(`/adherence/${patientId}/history?limit=abc`)
+          .set("Authorization", "Bearer valid-token");
+
+        expect(res1.status).toBe(400);
+        expect(res1.body.error).toContain("limit must be a positive integer");
+
+        const res2 = await request(app)
+          .get(`/adherence/${patientId}/history?limit=-5`)
+          .set("Authorization", "Bearer valid-token");
+
+        expect(res2.status).toBe(400);
+        expect(res2.body.error).toContain("limit must be a positive integer");
+      });
     });
   });
 });
