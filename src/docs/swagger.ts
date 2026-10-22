@@ -23,6 +23,7 @@ export const openApiSpec = {
     { name: "Doses", description: "Medication adherence tracking (Taken, Skipped, Unable to Take) and scheduled dose lifecycle" },
     { name: "Notifications", description: "Reminder notifications dispatch and delivery endpoint tracking" },
     { name: "Alerts", description: "Caregiver escalation alerts and adherence monitoring" },
+    { name: "Adherence", description: "AI-driven adherence analytics, pattern detection, and caregiver summaries" },
   ],
   components: {
     securitySchemes: {
@@ -320,6 +321,37 @@ export const openApiSpec = {
           createdAt: { type: "string", format: "date-time" },
           acknowledgedAt: { type: "string", format: "date-time", nullable: true },
           resolvedAt: { type: "string", format: "date-time", nullable: true },
+        },
+      },
+            AdherenceAnalysis: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          patientId: { type: "string", format: "uuid" },
+          kind: {
+            type: "string",
+            enum: ["RISK_ASSESSMENT", "DAILY_SUMMARY", "REMINDER_TIMING_SUGGESTION"],
+            example: "DAILY_SUMMARY",
+          },
+          periodStart: { type: "string", format: "date-time" },
+          periodEnd: { type: "string", format: "date-time" },
+          riskLevel: {
+            type: "string",
+            enum: ["STABLE", "NEEDS_ATTENTION", "HIGH_RISK"],
+            nullable: true,
+            example: "NEEDS_ATTENTION",
+          },
+          metrics: { type: "object" },
+          reasons: { type: "object", nullable: true },
+          summaryText: { type: "string", nullable: true },
+          generator: {
+            type: "string",
+            enum: ["RULES", "AI_MODEL"],
+            example: "AI_MODEL",
+          },
+          modelName: { type: "string", nullable: true, example: "nexpill-adherence-ml-v1" },
+          promptVersion: { type: "string", nullable: true, example: "1.0" },
+          createdAt: { type: "string", format: "date-time" },
         },
       },
       NotificationEndpoint: {
@@ -1367,6 +1399,167 @@ export const openApiSpec = {
                   type: "object",
                   properties: { endpoint: { $ref: "#/components/schemas/NotificationEndpoint" } },
                 },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/adherence/{patientId}/summary": {
+      get: {
+        tags: ["Adherence"],
+        summary: "Get Patient Adherence Summary",
+        description:
+          "Retrieves the latest generated adherence summary and risk level for a patient. Generates a 7-day summary on the fly if none exists.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: "patientId",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Target patient UUID",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Adherence analysis summary",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    analysis: { $ref: "#/components/schemas/AdherenceAnalysis" },
+                  },
+                },
+              },
+            },
+          },
+          401: {
+            description: "Missing or invalid authentication token",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Forbidden: Actor lacks authorization to view this patient",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          404: {
+            description: "Patient not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/adherence/{patientId}/analyze": {
+      post: {
+        tags: ["Adherence"],
+        summary: "Generate Adherence Analysis & Pattern Detection",
+        description:
+          "Computes deterministic adherence metrics, detects missed/delayed dose patterns and time-of-day friction, and persists an explainable report.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: "patientId",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Target patient UUID",
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  periodStart: { type: "string", format: "date-time" },
+                  periodEnd: { type: "string", format: "date-time" },
+                  kind: {
+                    type: "string",
+                    enum: ["RISK_ASSESSMENT", "DAILY_SUMMARY", "REMINDER_TIMING_SUGGESTION"],
+                  },
+                  generator: {
+                    type: "string",
+                    enum: ["RULES", "AI_MODEL"],
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Generated structured adherence report",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    report: {
+                      type: "object",
+                      properties: {
+                        patientId: { type: "string", format: "uuid" },
+                        period: {
+                          type: "object",
+                          properties: {
+                            start: { type: "string", format: "date-time" },
+                            end: { type: "string", format: "date-time" },
+                          },
+                        },
+                        metrics: { type: "object" },
+                        patterns: { type: "array", items: { type: "object" } },
+                        riskAssessment: {
+                          type: "object",
+                          properties: {
+                            level: { type: "string", enum: ["STABLE", "NEEDS_ATTENTION", "HIGH_RISK"] },
+                            score: { type: "number" },
+                            reasons: { type: "array", items: { type: "string" } },
+                          },
+                        },
+                        suggestedFollowUp: { type: "string" },
+                        summaryText: { type: "string" },
+                        analysisRecordId: { type: "string", format: "uuid" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: {
+            description: "Invalid input or date range",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: {
+            description: "Missing or invalid authentication token",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Forbidden: Actor lacks authorization to analyze this patient",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
               },
             },
           },
