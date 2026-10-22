@@ -3,7 +3,6 @@ import { z } from "zod/v4";
 import { MedicationInformationService } from "../services/medication-information.service";
 import { MedicationService } from "../services/medication.service";
 import { ScheduleService } from "../services/schedule.service";
-import { DoseService } from "../services/dose.service";
 import { AdherenceAnalyticsService } from "../services/adherence-analytics.service";
 
 export const createMedicalMcpServer = (userId: string): McpServer => {
@@ -107,7 +106,7 @@ export const createMedicalMcpServer = (userId: string): McpServer => {
     "get_patient_adherence_history",
     {
       description:
-        "Fetch authorized scheduled doses, statuses, and confirmation history within a date range.",
+        "Fetch authorized scheduled doses, observational adherence outcomes (ON_TIME, LATE, UNCONFIRMED, MISSED, SKIPPED), confirmation latency, and medication details within a date range.",
       inputSchema: {
         patientId: z.string().uuid().optional(),
         startDate: z.string().datetime().optional(),
@@ -120,16 +119,20 @@ export const createMedicalMcpServer = (userId: string): McpServer => {
       },
     },
     async ({ patientId, startDate, endDate }) => {
-      const doses = await DoseService.listDoses(userId, {
-        patientId,
-        startDate,
-        endDate,
-      });
+      const targetPatientId = patientId ?? userId;
+      const history = await AdherenceAnalyticsService.getAdherenceHistory(
+        userId,
+        targetPatientId,
+        {
+          startDate,
+          endDate,
+        },
+      );
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(doses, null, 2),
+            text: JSON.stringify(history, null, 2),
           },
         ],
       };

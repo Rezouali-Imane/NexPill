@@ -427,6 +427,50 @@ describe("Medical MCP Server & Transport", () => {
       await server.close();
     });
 
+    it("executes get_patient_adherence_history and returns observational outcomes", async () => {
+      const server = createMedicalMcpServer("user-1");
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+
+      await Promise.all([
+        client.connect(clientTransport),
+        server.connect(serverTransport),
+      ]);
+
+      const mockHistory = [
+        {
+          doseId: "dose-1",
+          scheduleId: "sched-1",
+          medication: { name: "Lisinopril", dosage: "10mg", route: "ORAL" },
+          scheduledAt: new Date("2026-10-20T08:00:00Z"),
+          timeOfDay: "morning",
+          status: "TAKEN",
+          adherenceResult: "ON_TIME",
+          delayMinutes: 3,
+          confirmedAt: new Date("2026-10-20T08:03:00Z"),
+          note: null,
+        },
+      ];
+
+      vi.spyOn(AdherenceAnalyticsService, "getAdherenceHistory").mockResolvedValueOnce(mockHistory as never);
+
+      const response = await client.callTool({
+        name: "get_patient_adherence_history",
+        arguments: {
+          patientId: "a0000000-0000-4000-8000-000000000001",
+        },
+      });
+
+      expect(response.isError).toBeFalsy();
+      const data = JSON.parse((response.content[0] as { text: string }).text);
+      expect(data).toHaveLength(1);
+      expect(data[0].adherenceResult).toBe("ON_TIME");
+      expect(data[0].medication.name).toBe("Lisinopril");
+
+      await client.close();
+      await server.close();
+    });
+
     it("handles authorization errors safely through MCP protocol", async () => {
       const server = createMedicalMcpServer("user-unauthorized");
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
