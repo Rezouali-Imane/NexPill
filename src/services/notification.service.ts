@@ -4,7 +4,7 @@ import type {
   NotificationKind,
   NotificationStatus,
   Prisma,
-  ScheduledDoseStatus,
+  DoseStatus,
 } from "@prisma/client";
 import { prisma } from "../db/prisma";
 import { BadRequestError, NotFoundError } from "../errors";
@@ -23,7 +23,7 @@ export interface ScheduleRemindersDoseInput {
   id: string;
   patientId: string;
   scheduledAt: Date;
-  status: ScheduledDoseStatus | string;
+  status: DoseStatus | string;
   schedule?: {
     reminder?: {
       reminderOffsetsMin?: number[];
@@ -92,7 +92,7 @@ export class NotificationService {
       return { scheduledCount: 0, notificationIds: [] };
     }
 
-    const reminder = dose.schedule.reminder;
+    const reminder = dose.schedule?.reminder;
     const offsetsMin = reminder?.reminderOffsetsMin ?? [0, 15];
     const lateAfterMin = reminder?.lateAfterMin ?? 15;
 
