@@ -466,6 +466,134 @@ describe("Reminder Scheduling & Notification Event Flow", () => {
       expect(response.body.endpoint.channel).toBe("PUSH");
       expect(response.body.endpoint.address).toBe("fcm-push-token-abc");
     });
+
+    it("GET /notifications/endpoints lists registered delivery endpoints", async () => {
+      authenticateAs(patientId);
+      mockPrisma.notificationEndpoint.findMany.mockResolvedValueOnce([
+        {
+          id: "ep-1",
+          userId: patientId,
+          channel: "PUSH",
+          address: "fcm-push-token-abc",
+          enabled: true,
+          createdAt: new Date(),
+        },
+      ]);
+
+      const response = await request(app)
+        .get("/notifications/endpoints")
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body.endpoints).toHaveLength(1);
+      expect(response.body.endpoints[0].channel).toBe("PUSH");
+      expect(mockPrisma.notificationEndpoint.findMany).toHaveBeenCalledWith({
+        where: { userId: patientId },
+        orderBy: { createdAt: "desc" },
+      });
+    });
+
+    it("rejects unauthenticated requests across endpoints with 401", async () => {
+      const resGet = await request(app).get("/notifications");
+      expect(resGet.status).toBe(401);
+
+      const resGetEndpoints = await request(app).get("/notifications/endpoints");
+      expect(resGetEndpoints.status).toBe(401);
+
+      const resPostEndpoints = await request(app)
+        .post("/notifications/endpoints")
+        .send({ channel: "PUSH", address: "token" });
+      expect(resPostEndpoints.status).toBe(401);
+
+      const resPatchDelivered = await request(app)
+        .patch(`/notifications/${notificationId}/delivered`);
+      expect(resPatchDelivered.status).toBe(401);
+
+      const resSchedule = await request(app)
+        .post(`/notifications/doses/${doseId}/schedule`);
+      expect(resSchedule.status).toBe(401);
+    });
+
+    it("POST /notifications/endpoints rejects invalid channel enum with 400", async () => {
+      authenticateAs(patientId);
+
+      const response = await request(app)
+        .post("/notifications/endpoints")
+        .set("Authorization", "Bearer valid-token")
+        .send({
+          channel: "CARRIER_PIGEON",
+          address: "123 Main St",
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain("Invalid channel");
+    });
+
+    it("POST /notifications/endpoints rejects empty or missing address with 400", async () => {
+      authenticateAs(patientId);
+
+      const response = await request(app)
+        .post("/notifications/endpoints")
+        .set("Authorization", "Bearer valid-token")
+        .send({
+          channel: "PUSH",
+          address: "   ",
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain("address is required and cannot be empty");
+    });
+
+    it("PATCH /notifications/:id/delivered returns 404 when notification does not exist", async () => {
+      authenticateAs(patientId);
+      mockPrisma.notification.findUnique.mockResolvedValueOnce(null);
+
+      const response = await request(app)
+        .patch(`/notifications/${notificationId}/delivered`)
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toContain("not found");
+    });
+
+    it("PATCH /notifications/:id/delivered returns 403 when user is not the recipient", async () => {
+      authenticateAs(patientId);
+      mockPrisma.notification.findUnique.mockResolvedValueOnce({
+        id: notificationId,
+        recipientId: caregiverId,
+        status: "SCHEDULED",
+      });
+
+      const response = await request(app)
+        .patch(`/notifications/${notificationId}/delivered`)
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(403);
+      expect(response.body.error).toContain("You do not have permission");
+    });
+
+    it("PATCH /notifications/:id/delivered rejects non-UUID notification ID with 400", async () => {
+      authenticateAs(patientId);
+
+      const response = await request(app)
+        .patch("/notifications/not-a-valid-uuid/delivered")
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain("must be a valid UUID");
+    });
+
+    it("POST /notifications/doses/:doseId/schedule returns 404 when scheduled dose does not exist", async () => {
+      authenticateAs(patientId);
+      mockPrisma.scheduledDose.findUnique.mockResolvedValueOnce(null);
+
+      const response = await request(app)
+        .post(`/notifications/doses/${doseId}/schedule`)
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toContain("not found");
+    });
   });
 
   describe("Notification dispatcher background lifecycle", () => {

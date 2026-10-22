@@ -7,7 +7,7 @@ import type {
   DoseStatus,
 } from "@prisma/client";
 import { prisma } from "../db/prisma";
-import { BadRequestError, NotFoundError } from "../errors";
+import { BadRequestError, ForbiddenError, NotFoundError } from "../errors";
 import {
   parseDate,
   validateNonEmptyString,
@@ -401,7 +401,7 @@ export class NotificationService {
     }
 
     if (notif.recipientId !== actorUserId) {
-      throw new NotFoundError(`Notification with ID "${notificationId}" not found.`);
+      throw new ForbiddenError(`You do not have permission to update this notification.`);
     }
 
     return prisma.notification.update({
@@ -427,6 +427,10 @@ export class NotificationService {
    * Registers or updates a notification endpoint (e.g. push token, email address).
    */
   static async registerEndpoint(userId: string, dto: RegisterEndpointDto) {
+    if (!dto || typeof dto !== "object") {
+      throw new BadRequestError("Request body must be a valid JSON object.");
+    }
+
     const address = validateNonEmptyString(dto.address, "address");
     const validChannels: NotificationChannel[] = ["IN_APP", "PUSH", "EMAIL", "SMS"];
 
