@@ -282,8 +282,11 @@ export class NotificationService {
 
     for (const notif of dueNotifications) {
       try {
-        // If it's a dose reminder and the dose is no longer PENDING, cancel it
-        if (notif.dose && notif.dose.status !== "PENDING") {
+        // Only cancel reminder notifications if the dose is no longer PENDING
+        const isDoseReminder =
+          notif.kind === "DOSE_REMINDER" || notif.kind === "DOSE_REMINDER_FOLLOWUP";
+
+        if (isDoseReminder && notif.dose && notif.dose.status !== "PENDING") {
           await prisma.notification.update({
             where: { id: notif.id },
             data: {
@@ -342,15 +345,39 @@ export class NotificationService {
       recipientId: actorUserId,
     };
 
+    const validStatuses: NotificationStatus[] = [
+      "SCHEDULED",
+      "SENDING",
+      "DELIVERED",
+      "FAILED",
+      "CANCELLED",
+    ];
     if (query.status) {
+      if (!validStatuses.includes(query.status)) {
+        throw new BadRequestError(`Invalid status "${query.status}".`);
+      }
       where.status = query.status;
     }
 
+    const validKinds: NotificationKind[] = [
+      "DOSE_REMINDER",
+      "DOSE_REMINDER_FOLLOWUP",
+      "CAREGIVER_ALERT",
+      "SAFETY_WARNING",
+      "DAILY_SUMMARY",
+    ];
     if (query.kind) {
+      if (!validKinds.includes(query.kind)) {
+        throw new BadRequestError(`Invalid kind "${query.kind}".`);
+      }
       where.kind = query.kind;
     }
 
+    const validChannels: NotificationChannel[] = ["IN_APP", "PUSH", "EMAIL", "SMS"];
     if (query.channel) {
+      if (!validChannels.includes(query.channel)) {
+        throw new BadRequestError(`Invalid channel "${query.channel}".`);
+      }
       where.channel = query.channel;
     }
 
@@ -402,6 +429,10 @@ export class NotificationService {
 
     if (notif.recipientId !== actorUserId) {
       throw new ForbiddenError(`You do not have permission to update this notification.`);
+    }
+
+    if (notif.status === "CANCELLED") {
+      throw new BadRequestError("Cannot mark a CANCELLED notification as delivered.");
     }
 
     return prisma.notification.update({

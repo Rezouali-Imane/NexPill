@@ -307,6 +307,45 @@ describe("Reminder Scheduling & Notification Event Flow", () => {
       );
     });
 
+    it("delivers CAREGIVER_ALERT notifications even if the linked dose is MISSED", async () => {
+      const referenceTime = new Date("2026-10-19T10:05:00.000Z");
+
+      const caregiverAlertNotification = {
+        id: "alert-notif-1",
+        recipientId: caregiverId,
+        patientId,
+        doseId,
+        kind: "CAREGIVER_ALERT",
+        channel: "IN_APP",
+        status: "SCHEDULED",
+        scheduledFor: new Date("2026-10-19T10:00:00.000Z"),
+        dose: {
+          id: doseId,
+          status: "MISSED",
+        },
+      };
+
+      mockPrisma.notification.findMany.mockResolvedValueOnce([caregiverAlertNotification]);
+      mockPrisma.notification.update.mockResolvedValueOnce({
+        ...caregiverAlertNotification,
+        status: "DELIVERED",
+        deliveredAt: referenceTime,
+      });
+
+      const result = await NotificationService.dispatchDueNotifications(referenceTime);
+
+      expect(result.deliveredCount).toBe(1);
+      expect(result.cancelledCount).toBe(0);
+      expect(mockPrisma.notification.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "alert-notif-1" },
+          data: expect.objectContaining({
+            status: "DELIVERED",
+          }),
+        }),
+      );
+    });
+
     it("cancels all pending reminders when cancelPendingDoseReminders is invoked", async () => {
       mockPrisma.notification.updateMany.mockResolvedValueOnce({ count: 2 });
 
@@ -570,6 +609,47 @@ describe("Reminder Scheduling & Notification Event Flow", () => {
 
       expect(response.status).toBe(403);
       expect(response.body.error).toContain("You do not have permission");
+    });
+
+    it("PATCH /notifications/:id/delivered rejects marking CANCELLED notification as delivered with 400", async () => {
+      authenticateAs(patientId);
+      mockPrisma.notification.findUnique.mockResolvedValueOnce({
+        id: notificationId,
+        recipientId: patientId,
+        status: "CANCELLED",
+      });
+
+      const response = await request(app)
+        .patch(`/notifications/${notificationId}/delivered`)
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain("Cannot mark a CANCELLED notification");
+    });
+
+    it("GET /notifications rejects invalid status or kind query parameters with 400", async () => {
+      authenticateAs(patientId);
+
+      const resStatus = await request(app)
+        .get("/notifications")
+        .query({ status: "INVALID_STATUS" })
+        .set("Authorization", "Bearer valid-token");
+      expect(resStatus.status).toBe(400);
+      expect(resStatus.body.error).toContain("Invalid status");
+
+      const resKind = await request(app)
+        .get("/notifications")
+        .query({ kind: "INVALID_KIND" })
+        .set("Authorization", "Bearer valid-token");
+      expect(resKind.status).toBe(400);
+      expect(resKind.body.error).toContain("Invalid kind");
+
+      const resChannel = await request(app)
+        .get("/notifications")
+        .query({ channel: "INVALID_CHANNEL" })
+        .set("Authorization", "Bearer valid-token");
+      expect(resChannel.status).toBe(400);
+      expect(resChannel.body.error).toContain("Invalid channel");
     });
 
     it("PATCH /notifications/:id/delivered rejects non-UUID notification ID with 400", async () => {
