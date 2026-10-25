@@ -32,6 +32,7 @@ import {
   CLINICAL_DISCLAIMER,
   DEMO_AHMED_PATIENT_ID,
 } from "../src/services/clinical-agent.service";
+import * as doseRealtime from "../src/realtime/dose-events";
 
 describe("Clinical AI Agent with Medical Safeguards", () => {
   const patientId = "a0000000-0000-4000-8000-000000000001";
@@ -182,6 +183,86 @@ describe("Clinical AI Agent with Medical Safeguards", () => {
       expect(result.response).toContain("Lisinopril");
       expect(result.response).toContain("Atorvastatin");
     });
+
+    it("invokes get_patient_adherence_history MCP tool when asked for dose history or events", async () => {
+      mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([
+        {
+          id: "dose-101",
+          scheduleId: "sched-101",
+          status: "TAKEN",
+          scheduledAt: new Date("2026-10-24T08:00:00Z"),
+          resolvedAt: new Date("2026-10-24T08:05:00Z"),
+          events: [],
+          schedule: {
+            medication: { id: "med-1", name: "Metformin", dosageText: "500mg" },
+          },
+        },
+      ]);
+
+      const result = await ClinicalAgentService.processQuery(caregiverId, {
+        query: "What is the recent dose history and confirmation events for this patient?",
+        patientId,
+      });
+
+      expect(result.safeguardTriggered).toBe(false);
+      expect(result.toolsInvoked).toContain("get_patient_adherence_history");
+      expect(result.response).toContain("Metformin");
+      expect(result.response).toContain("ON_TIME");
+    });
+
+    it("invokes lookup_medication_information MCP tool when asked for drug reference info", async () => {
+      const result = await ClinicalAgentService.processQuery(caregiverId, {
+        query: "lookup Lisinopril reference information",
+        patientId,
+      });
+
+      expect(result.safeguardTriggered).toBe(false);
+      expect(result.toolsInvoked).toContain("lookup_medication_information");
+      expect(result.response).toContain("Reference information for Lisinopril");
+    });
+
+    it("invokes list_medications and list_schedules MCP tools when asked for schedules routine", async () => {
+      const validMedId = "11111111-2222-4333-8444-555555555555";
+      mockPrisma.medication.findMany.mockResolvedValueOnce([
+        { id: validMedId, name: "Lisinopril", dosageText: "10mg" },
+      ]);
+      mockPrisma.medicationSchedule.findMany.mockResolvedValueOnce([
+        {
+          id: "sched-1",
+          medicationId: validMedId,
+          doseLabel: "Morning",
+          timesOfDay: ["08:00"],
+          daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
+          reminder: { reminderOffsetsMin: [15, 0] },
+        },
+      ]);
+
+      const result = await ClinicalAgentService.processQuery(caregiverId, {
+        query: "What is the schedule routine and frequency for this patient?",
+        patientId,
+      });
+
+      expect(result.safeguardTriggered).toBe(false);
+      expect(result.toolsInvoked).toContain("list_medications");
+      expect(result.toolsInvoked).toContain("list_schedules");
+      expect(result.response).toContain("schedule settings retrieved");
+    });
+
+    it("invokes generate_adherence_summary MCP tool by default when a general overview is requested", async () => {
+      mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([]);
+      mockPrisma.adherenceAnalysis.create.mockResolvedValueOnce({
+        id: "analysis-1",
+        createdAt: new Date(),
+      });
+
+      const result = await ClinicalAgentService.processQuery(caregiverId, {
+        query: "Provide a general overview and caregiver summary for this patient",
+        patientId,
+      });
+
+      expect(result.safeguardTriggered).toBe(false);
+      expect(result.toolsInvoked).toContain("generate_adherence_summary");
+    });
   });
 
   describe("Agent REST API Endpoints", () => {
@@ -248,6 +329,184 @@ describe("Clinical AI Agent with Medical Safeguards", () => {
           });
 
         expect(res.status).toBe(403);
+      });
+
+      it("rejects caregiver with PENDING access status with 403 Forbidden", async () => {
+        mockPrisma.caregiverAccess.findUnique.mockResolvedValueOnce({
+          status: "PENDING",
+          canViewSchedule: true,
+        });
+
+        const res = await request(app)
+          .post("/agent/query")
+          .set("Authorization", "Bearer valid-token")
+          .send({
+            query: "Show patient adherence report",
+            patientId,
+          });
+
+        expect(res.status).toBe(403);
+        expect(res.body.error).toContain("active caregiver access");
+      });
+
+      it("rejects caregiver with REVOKED access status with 403 Forbidden", async () => {
+        mockPrisma.caregiverAccess.findUnique.mockResolvedValueOnce({
+          status: "REVOKED",
+          canViewSchedule: true,
+        });
+
+        const res = await request(app)
+          .post("/agent/query")
+          .set("Authorization", "Bearer valid-token")
+          .send({
+            query: "Show patient adherence report",
+            patientId,
+          });
+
+        expect(res.status).toBe(403);
+        expect(res.body.error).toContain("active caregiver access");
+      });
+
+      it("rejects caregiver with canViewSchedule: false with 403 Forbidden", async () => {
+        mockPrisma.caregiverAccess.findUnique.mockResolvedValueOnce({
+          status: "ACTIVE",
+          canViewSchedule: false,
+        });
+
+        const res = await request(app)
+          .post("/agent/query")
+          .set("Authorization", "Bearer valid-token")
+          .send({
+            query: "Show patient adherence report",
+            patientId,
+          });
+
+        expect(res.status).toBe(403);
+        expect(res.body.error).toContain("do not allow viewing this patient's schedule");
+      });
+
+      it("allows patient direct access to own agent data without caregiver record", async () => {
+        mockGetUser.mockResolvedValueOnce({
+          data: { user: { id: patientId, email: "patient@nexpill.test" } },
+          error: null,
+        });
+
+        mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([]);
+
+        const res = await request(app)
+          .post("/agent/query")
+          .set("Authorization", "Bearer valid-token")
+          .send({
+            query: "Detect any adherence patterns for my doses",
+            patientId,
+          });
+
+        expect(res.status).toBe(200);
+        expect(res.body.safeguardTriggered).toBe(false);
+        expect(mockPrisma.caregiverAccess.findUnique).not.toHaveBeenCalled();
+      });
+
+      it("allows platform admin access to any patient without caregiver record", async () => {
+        const adminId = "e0000000-0000-4000-8000-000000000005";
+        mockGetUser.mockResolvedValueOnce({
+          data: { user: { id: adminId, email: "admin@nexpill.test" } },
+          error: null,
+        });
+        mockPrisma.user.findUnique.mockResolvedValueOnce({
+          platformRole: "ADMIN",
+          disabledAt: null,
+        });
+        mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([]);
+
+        const res = await request(app)
+          .post("/agent/query")
+          .set("Authorization", "Bearer valid-token")
+          .send({
+            query: "Detect adherence patterns for patient",
+            patientId,
+          });
+
+        expect(res.status).toBe(200);
+        expect(res.body.safeguardTriggered).toBe(false);
+      });
+
+      it("rejects disabled user accounts with 403 Forbidden", async () => {
+        mockPrisma.user.findUnique.mockResolvedValueOnce({
+          platformRole: "USER",
+          disabledAt: new Date("2026-10-01T00:00:00Z"),
+        });
+
+        const res = await request(app)
+          .post("/agent/query")
+          .set("Authorization", "Bearer valid-token")
+          .send({
+            query: "Show patient adherence report",
+            patientId,
+          });
+
+        expect(res.status).toBe(403);
+        expect(res.body.error).toContain("not allowed to access application data");
+      });
+    });
+
+    describe("Real-time Updates Integration with Agent", () => {
+      it("emits agent.insight event when query executes on demo data", async () => {
+        const emitSpy = vi.spyOn(doseRealtime, "emitAgentInsight");
+
+        const res = await request(app)
+          .post("/agent/query")
+          .set("Authorization", "Bearer valid-token")
+          .send({
+            query: "What is Ahmed's evening adherence risk?",
+            useDemoData: true,
+          });
+
+        expect(res.status).toBe(200);
+        expect(emitSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            patientId: DEMO_AHMED_PATIENT_ID,
+            safeguardTriggered: false,
+            toolsInvoked: expect.arrayContaining(["detect_adherence_patterns"]),
+          }),
+        );
+      });
+
+      it("emits agent.insight event when query executes on real application data", async () => {
+        const emitSpy = vi.spyOn(doseRealtime, "emitAgentInsight");
+        mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([]);
+
+        const res = await request(app)
+          .post("/agent/query")
+          .set("Authorization", "Bearer valid-token")
+          .send({
+            query: "Detect adherence patterns for this patient",
+            patientId,
+          });
+
+        expect(res.status).toBe(200);
+        expect(emitSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            patientId,
+            safeguardTriggered: false,
+            toolsInvoked: expect.arrayContaining(["detect_adherence_patterns"]),
+          }),
+        );
+      });
+
+      it("does not emit agent.insight event when clinical safeguard refusal is triggered", async () => {
+        const emitSpy = vi.spyOn(doseRealtime, "emitAgentInsight");
+
+        const res = await request(app)
+          .post("/agent/query")
+          .set("Authorization", "Bearer valid-token")
+          .send({
+            query: "Increase dosage to 50mg",
+            patientId,
+          });
+
+        expect(res.status).toBe(200);
+        expect(res.body.safeguardTriggered).toBe(true);
+        expect(emitSpy).not.toHaveBeenCalled();
       });
     });
 

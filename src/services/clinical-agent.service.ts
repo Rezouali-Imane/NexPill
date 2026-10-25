@@ -3,6 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMedicalMcpServer } from "../mcp/medical-server";
 import { AccessControlService } from "./access-control.service";
 import { validateUuid } from "../utils/validation";
+import { emitAgentInsight } from "../realtime/dose-events";
 
 export interface AgentQueryResult {
   response: string;
@@ -17,6 +18,41 @@ export const CLINICAL_DISCLAIMER =
   "Disclaimer: Observational adherence tracking and behavioral pattern insights only. Not a medical diagnosis or treatment directive.";
 
 export const DEMO_AHMED_PATIENT_ID = "00000000-0000-4000-8000-000000000001";
+
+interface PatternToolResult {
+  metrics: {
+    confirmationRate: number;
+    confirmedCount: number;
+    totalScheduled: number;
+  };
+  riskAssessment: {
+    level: string;
+    score: number;
+    reasons: string[];
+  };
+}
+
+interface DoseHistoryToolItem {
+  medication: { name: string };
+  adherenceResult: string;
+  timeOfDay: string;
+}
+
+interface MedicationToolItem {
+  id?: string;
+  name: string;
+  dosageText?: string;
+}
+
+interface MedicationInfoToolResult {
+  name?: string;
+  rxcui?: string;
+  synonyms?: string[];
+}
+
+interface SummaryToolResult {
+  summaryText?: string;
+}
 
 export class ClinicalAgentService {
   /**
@@ -116,6 +152,15 @@ export class ClinicalAgentService {
     return r.content?.[0]?.text ?? "{}";
   }
 
+  private static parseToolJson<T>(res: unknown, fallback: T): T {
+    try {
+      const text = this.parseToolResponseText(res);
+      return JSON.parse(text) as T;
+    } catch {
+      return fallback;
+    }
+  }
+
   /**
    * Connects the clinical agent to backend MCP tools and processes queries with strict safeguards.
    */
@@ -161,13 +206,26 @@ export class ClinicalAgentService {
           `His overall confirmation rate is 80% (28/35 doses confirmed). Morning adherence is high (95%), but evening doses carry substantial friction (40% confirmation rate).`;
       }
 
-      return {
+      const demoResult: AgentQueryResult = {
         response: answer,
         safeguardTriggered: false,
         toolsInvoked: ["detect_adherence_patterns", "get_patient_adherence_history"],
         disclaimer: CLINICAL_DISCLAIMER,
         data: demoData,
       };
+
+      emitAgentInsight({
+        patientId: DEMO_AHMED_PATIENT_ID,
+        actorUserId,
+        query,
+        response: answer,
+        safeguardTriggered: false,
+        toolsInvoked: demoResult.toolsInvoked,
+        timestamp: new Date().toISOString(),
+        data: demoData,
+      });
+
+      return demoResult;
     }
 
     // Step 3: Real Application Data Query via Medical MCP Server
@@ -200,7 +258,7 @@ export class ClinicalAgentService {
           arguments: { patientId: targetPatientId },
         });
 
-        const parsed = JSON.parse(this.parseToolResponseText(res));
+        const parsed = this.parseToolJson<PatternToolResult>(res, { metrics: { confirmationRate: 1, confirmedCount: 0, totalScheduled: 0 }, riskAssessment: { level: "STABLE", score: 0, reasons: [] } });
         dataPayload = parsed;
 
         const ratePct = Math.round(parsed.metrics.confirmationRate * 100);
@@ -218,7 +276,7 @@ export class ClinicalAgentService {
           arguments: { patientId: targetPatientId },
         });
 
-        const history = JSON.parse(this.parseToolResponseText(res));
+        const history = this.parseToolJson<DoseHistoryToolItem[]>(res, []);
         dataPayload = { history };
         responseText =
           `Retrieved ${history.length} recent scheduled dose records. ` +
@@ -234,11 +292,53 @@ export class ClinicalAgentService {
           arguments: { patientId: targetPatientId },
         });
 
-        const meds = JSON.parse(this.parseToolResponseText(res));
+        const meds = this.parseToolJson<MedicationToolItem[]>(res, []);
         dataPayload = { medications: meds };
         responseText =
           `Patient has ${meds.length} active medications on record: ` +
           meds.map((m: { name: string; dosageText?: string }) => `${m.name} (${m.dosageText ?? "standard"})`).join(", ") + ".";
+      } else if (
+        lower.includes("lookup") ||
+        lower.includes("rxnorm") ||
+        lower.includes("information for") ||
+        lower.includes("info for")
+      ) {
+        // Lookup medication reference information via NIH RxNorm MCP tool
+        toolsInvoked.push("lookup_medication_information");
+        const match = query.match(/(?:lookup|rxnorm|information for|info for|about)\s+([a-zA-Z0-9\-_ ]+)/i);
+        const medName = match ? match[1].trim() : "Lisinopril";
+        const res = await client.callTool({
+          name: "lookup_medication_information",
+          arguments: { medicationName: medName },
+        });
+
+        const info = this.parseToolJson<MedicationInfoToolResult>(res, { name: medName });
+        dataPayload = { medicationInformation: info };
+        const synList = Array.isArray(info.synonyms) && info.synonyms.length > 0
+          ? ` Synonyms: ${info.synonyms.slice(0, 3).join(", ")}.`
+          : "";
+        responseText = `Reference information for ${info.name ?? medName}: NIH RxNorm Concept ID ${info.rxcui ?? "N/A"}.${synList} (Reference data only; not medical advice).`;
+      } else if (lower.includes("schedule") || lower.includes("frequency") || lower.includes("routine")) {
+        // Query medication schedules via MCP tools
+        toolsInvoked.push("list_medications");
+        const medsRes = await client.callTool({
+          name: "list_medications",
+          arguments: { patientId: targetPatientId },
+        });
+        const meds = this.parseToolJson<MedicationToolItem[]>(medsRes, []);
+
+        let schedulesList: unknown[] = [];
+        if (Array.isArray(meds) && meds.length > 0 && meds[0].id) {
+          toolsInvoked.push("list_schedules");
+          const schedRes = await client.callTool({
+            name: "list_schedules",
+            arguments: { medicationId: meds[0].id },
+          });
+          schedulesList = this.parseToolJson<unknown[]>(schedRes, []);
+        }
+
+        dataPayload = { medications: meds, schedules: schedulesList };
+        responseText = `Patient has ${meds.length} prescribed medications with ${schedulesList.length} schedule settings retrieved.`;
       } else {
         // Default to comprehensive summary
         toolsInvoked.push("generate_adherence_summary");
@@ -247,7 +347,7 @@ export class ClinicalAgentService {
           arguments: { patientId: targetPatientId },
         });
 
-        const summary = JSON.parse(this.parseToolResponseText(res));
+        const summary = this.parseToolJson<SummaryToolResult>(res, { summaryText: "Adherence analysis completed." });
         dataPayload = summary;
         responseText = summary.summaryText ?? "Adherence analysis completed.";
       }
@@ -256,12 +356,25 @@ export class ClinicalAgentService {
       await server.close();
     }
 
-    return {
+    const finalResult: AgentQueryResult = {
       response: responseText,
       safeguardTriggered: false,
       toolsInvoked,
       disclaimer: CLINICAL_DISCLAIMER,
       data: dataPayload,
     };
+
+    emitAgentInsight({
+      patientId: targetPatientId,
+      actorUserId,
+      query,
+      response: responseText,
+      safeguardTriggered: false,
+      toolsInvoked,
+      timestamp: new Date().toISOString(),
+      data: dataPayload,
+    });
+
+    return finalResult;
   }
 }
