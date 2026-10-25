@@ -3,6 +3,7 @@ dist/
 coverage/
 logs/
 *.log
+*.tsbuildinfo
 
 .env
 .env.*
@@ -17,6 +18,10 @@ Thumbs.db
 # Internal documentation requested to be gitignored
 BACKEND_DEV_GUIDE.md
 BACKEND_OVERVIEW.md
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
 
 # Python
 __pycache__/
