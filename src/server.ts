@@ -34,9 +34,9 @@ server.listen(primaryPort, "0.0.0.0", () => {
   console.log(`NexPill API listening on http://0.0.0.0:${primaryPort} (${env.nodeEnv})`);
 });
 
-// Dual-port safety: if primary port is not 3000, also bind port 3000 in case Railway proxy targets 3000
+// Dual-port safety: on platforms with custom port routing (e.g. Railway), bind port 3000 as fallback
 let fallbackServer: Server | null = null;
-if (primaryPort !== 3000) {
+if (primaryPort !== 3000 && !process.env.RENDER) {
   try {
     fallbackServer = createServer(app);
     fallbackServer.listen(3000, "0.0.0.0", () => {

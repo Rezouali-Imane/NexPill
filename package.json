@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "NexPill backend foundation",
   "main": "dist/server.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc",
