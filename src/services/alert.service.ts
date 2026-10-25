@@ -7,6 +7,7 @@ import { prisma } from "../db/prisma";
 import { ForbiddenError, NotFoundError } from "../errors";
 import { validateUuid } from "../utils/validation";
 import { AccessControlService } from "./access-control.service";
+import { emitAlertCreated } from "../realtime/dose-events";
 
 export interface ListAlertsQuery {
   patientId?: string;
@@ -312,6 +313,16 @@ export class AlertService {
           dedupeKey,
         },
         update: {},
+      });
+
+      emitAlertCreated({
+        alertId: alert.id,
+        patientId,
+        recipientId: caregiver.caregiverId,
+        type: "REPEATED_MISSES",
+        message: alert.message,
+        status: alert.status,
+        timestamp: (alert.createdAt ?? referenceTime).toISOString(),
       });
 
       const notifDedupeKey = `alert-notif-${alert.id}-IN_APP`;

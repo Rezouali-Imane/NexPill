@@ -1,5 +1,5 @@
 import { prisma } from "../db/prisma";
-import { emitDoseUpdate } from "../realtime/dose-events";
+import { emitDoseUpdate, emitAlertCreated } from "../realtime/dose-events";
 import { AlertService } from "../services/alert.service";
 
 export interface MissedDoseJobResult {
@@ -123,6 +123,16 @@ export class MissedDoseJobService {
                 update: {},
               });
               alertsCreatedCount++;
+
+              emitAlertCreated({
+                alertId: alert.id,
+                patientId: dose.patientId,
+                recipientId: caregiver.caregiverId,
+                type: "DOSE_MISSED",
+                message: alert.message,
+                status: alert.status,
+                timestamp: (alert.createdAt ?? referenceTime).toISOString(),
+              });
 
               const notifDedupeKey = `alert-notif-${alert.id}-IN_APP`;
               await tx.notification.upsert({
@@ -277,6 +287,16 @@ export class MissedDoseJobService {
               dedupeKey,
             },
             update: {},
+          });
+
+          emitAlertCreated({
+            alertId: alert.id,
+            patientId: dose.patientId,
+            recipientId: caregiver.caregiverId,
+            type: "DOSE_LATE",
+            message: alert.message,
+            status: alert.status,
+            timestamp: (alert.createdAt ?? referenceTime).toISOString(),
           });
 
           const notifDedupeKey = `alert-notif-${alert.id}-IN_APP`;

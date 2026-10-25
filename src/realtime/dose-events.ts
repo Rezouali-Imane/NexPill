@@ -17,6 +17,38 @@ export interface DoseRealtimePayload {
   occurredAt?: Date;
 }
 
+export interface AgentInsightRealtimePayload {
+  patientId: string;
+  actorUserId: string;
+  query: string;
+  response: string;
+  safeguardTriggered: boolean;
+  toolsInvoked: string[];
+  timestamp: string;
+  data?: Record<string, unknown>;
+}
+
+export interface AdherenceRealtimePayload {
+  patientId: string;
+  actorUserId: string;
+  riskLevel: string;
+  confirmationRate: number;
+  reasons: string[];
+  suggestedFollowUp?: string;
+  summaryText?: string;
+  timestamp: string;
+}
+
+export interface AlertRealtimePayload {
+  alertId: string;
+  patientId: string;
+  recipientId: string;
+  type: string;
+  message: string;
+  status: string;
+  timestamp: string;
+}
+
 let io: Server | null = null;
 
 const getToken = (socket: Socket): string | undefined => {
@@ -87,7 +119,7 @@ export const initializeDoseRealtime = (httpServer: HttpServer): Server => {
     socket.join(`patient:${user.id}`);
 
     const accesses = await prisma.caregiverAccess.findMany({
-      where: { caregiverId: user.id, status: "ACTIVE" },
+      where: { caregiverId: user.id, status: "ACTIVE", canViewSchedule: true },
       select: { patientId: true },
     });
     for (const access of accesses) {
@@ -100,6 +132,25 @@ export const initializeDoseRealtime = (httpServer: HttpServer): Server => {
 
 export const emitDoseUpdate = (payload: DoseRealtimePayload): void => {
   io?.to(`patient:${payload.patientId}`).emit("dose.updated", payload);
+};
+
+export const emitAgentInsight = (payload: AgentInsightRealtimePayload): void => {
+  io?.to(`patient:${payload.patientId}`).emit("agent.insight", payload);
+};
+
+export const emitAdherenceUpdate = (payload: AdherenceRealtimePayload): void => {
+  io?.to(`patient:${payload.patientId}`).emit("adherence.updated", payload);
+};
+
+export const emitAlertCreated = (payload: AlertRealtimePayload): void => {
+  io?.to(`patient:${payload.patientId}`).emit("alert.created", payload);
+  io?.to(`user:${payload.recipientId}`).emit("alert.created", payload);
+};
+
+export const getRealtimeServer = (): Server | null => io;
+
+export const setRealtimeServerForTesting = (mockIo: Server | null): void => {
+  io = mockIo;
 };
 
 export const closeDoseRealtime = async (): Promise<void> => {

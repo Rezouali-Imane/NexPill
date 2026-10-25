@@ -11,6 +11,7 @@ import { BadRequestError } from "../errors";
 import { parseDate, validateUuid } from "../utils/validation";
 import { AccessControlService } from "./access-control.service";
 import { AiSummaryService } from "./ai-summary.service";
+import { emitAdherenceUpdate } from "../realtime/dose-events";
 
 export type TimeOfDayBucket = "morning" | "afternoon" | "evening" | "night";
 
@@ -630,6 +631,17 @@ export class AdherenceAnalyticsService {
         modelName,
         promptVersion,
       },
+    });
+
+    emitAdherenceUpdate({
+      patientId,
+      actorUserId,
+      riskLevel: riskAssessment.level,
+      confirmationRate: metrics.confirmationRate,
+      reasons: riskAssessment.reasons,
+      suggestedFollowUp,
+      summaryText,
+      timestamp: new Date().toISOString(),
     });
 
     return {
