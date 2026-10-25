@@ -20,7 +20,16 @@ function ShareIdCard() {
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
   useEffect(() => { void getShareId().then(setId); }, [getShareId]);
-  const renew = async () => { setBusy(true); const n = await regenerateShareId(); if (n) setId(n); setBusy(false); };
+  const renew = async () => {
+    setConfirm(false);
+    setBusy(true);
+    try {
+      const n = await regenerateShareId();
+      if (n) setId(n);
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <Card aria-labelledby="invite-h">
       <h2 id="invite-h" className={p.h2}>Your NexPill ID</h2>

@@ -30,7 +30,9 @@ export class CaregiverAccessService {
   ) {
     await AccessControlService.assertPatientAccess(patientId, patientId, "read");
 
-    const token = crypto.randomBytes(32).toString("base64url");
+    const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    const bytes = crypto.randomBytes(8);
+    const token = "NX-" + Array.from(bytes).map((b) => alphabet[b % alphabet.length]).join("");
     const inviteExpiresAt = new Date(Date.now() + INVITE_TTL_MS);
     const access = await prisma.$transaction(async (tx) => {
       const created = await tx.caregiverAccess.create({
@@ -72,11 +74,19 @@ export class CaregiverAccessService {
     caregiverEmail: string,
     token: string,
   ) {
-    const tokenHash = hashToken(token);
+    const cleanToken = token.trim().toUpperCase();
+    const tokenWithPrefix = cleanToken.startsWith("NX-") ? cleanToken : "NX-" + cleanToken;
+    const tokenWithoutPrefix = cleanToken.replace(/^NX-/, "");
+    const hashes = [
+      hashToken(token),
+      hashToken(cleanToken),
+      hashToken(tokenWithPrefix),
+      hashToken(tokenWithoutPrefix),
+    ];
     const now = new Date();
     const invite = await prisma.caregiverAccess.findFirst({
       where: {
-        inviteTokenHash: tokenHash,
+        inviteTokenHash: { in: hashes },
         status: "PENDING",
         inviteExpiresAt: { gt: now },
       },

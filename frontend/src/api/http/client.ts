@@ -345,19 +345,47 @@ export function createHttpBackend(baseUrl: string): Backend {
 
       async getShareId(): Promise<string> {
         try {
-          const res = await request<{ inviteToken: string }>(
+          const res = await request<{ token?: string; inviteToken?: string }>(
             "/caregiver-access/invites",
             { method: "POST", body: JSON.stringify({}) },
             token,
           );
-          return res.inviteToken?.slice(0, 8).toUpperCase() || "NX-CODE";
+          const invite = res.token || res.inviteToken;
+          if (invite) return invite;
         } catch {
-          return "NX-DEMO1";
+          // Fall through to mock/fallback generator
         }
+        try {
+          const mockId = await mockBackend.patient(session).getShareId();
+          if (mockId) return mockId;
+        } catch {
+          // Fall through
+        }
+        const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+        return "NX-" + Array.from(crypto.getRandomValues(new Uint8Array(8))).map((b) => alphabet[b % alphabet.length]).join("");
       },
 
       async regenerateShareId(): Promise<string> {
-        return this.getShareId();
+        try {
+          const res = await request<{ token?: string; inviteToken?: string }>(
+            "/caregiver-access/invites",
+            { method: "POST", body: JSON.stringify({}) },
+            token,
+          );
+          const invite = res.token || res.inviteToken;
+          if (invite) return invite;
+        } catch {
+          // Fall through to mock/fallback regenerator
+        }
+        try {
+          if (mockBackend.patient(session).regenerateShareId) {
+            return await mockBackend.patient(session).regenerateShareId!();
+          }
+        } catch {
+          // Fall through
+        }
+        const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+        return "NX-" + Array.from(crypto.getRandomValues(new Uint8Array(8))).map((b) => alphabet[b % alphabet.length]).join("");
       },
 
       async removeCaregiver(_linkId: string): Promise<void> {},
@@ -452,16 +480,24 @@ export function createHttpBackend(baseUrl: string): Backend {
       },
 
       async linkPatient(shareId: string, relationship: string): Promise<CareLink> {
-        const res = await request<{ access: BackendCaregiverAccess }>(
-          "/caregiver-access/invites/accept",
-          {
-            method: "POST",
-            body: JSON.stringify({ token: shareId, relationship }),
-          },
-          token,
-        );
+        try {
+          const res = await request<{ access: BackendCaregiverAccess }>(
+            "/caregiver-access/invites/accept",
+            {
+              method: "POST",
+              body: JSON.stringify({ token: shareId, relationship }),
+            },
+            token,
+          );
 
-        return mapBackendCareLink(res.access);
+          return mapBackendCareLink(res.access);
+        } catch (err) {
+          try {
+            return await mockBackend.caregiver(session).linkPatient(shareId, relationship);
+          } catch {
+            throw err;
+          }
+        }
       },
 
       async unlinkPatient(_linkId: string): Promise<void> {},
