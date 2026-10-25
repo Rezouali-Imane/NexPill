@@ -254,7 +254,6 @@ export function InsightsCard({ view, today, now }: { view: PatientView; today: s
 
   const [agentQuery, setAgentQuery] = useState('');
   const [agentAnswer, setAgentAnswer] = useState<string | null>(null);
-  const [toolsUsed, setToolsUsed] = useState<string[]>([]);
   const [safeguardTriggered, setSafeguardTriggered] = useState(false);
   const [isQuerying, setIsQuerying] = useState(false);
 
@@ -290,31 +289,17 @@ export function InsightsCard({ view, today, now }: { view: PatientView; today: s
       if (res.ok) {
         const data = await res.json();
         setAgentAnswer(data.answer);
-        setToolsUsed(
-          data.toolsUsed || [
-            'get_patient_adherence_history',
-            'detect_adherence_patterns',
-          ],
-        );
         setSafeguardTriggered(Boolean(data.safeguardTriggered));
       } else {
         setAgentAnswer(
           `Clinical Analysis for ${first}: Morning doses show steady adherence (90%+). Evening slots show repeated delays past 18:00. Suggested adjustment: coordinate evening reminder with dinner routine.`,
         );
-        setToolsUsed([
-          'get_patient_adherence_history',
-          'detect_adherence_patterns',
-        ]);
         setSafeguardTriggered(false);
       }
     } catch {
       setAgentAnswer(
         `Clinical Analysis for ${first}: Morning doses show steady adherence (90%+). Evening slots show repeated delays past 18:00. Suggested adjustment: coordinate evening reminder with dinner routine.`,
       );
-      setToolsUsed([
-        'get_patient_adherence_history',
-        'detect_adherence_patterns',
-      ]);
       setSafeguardTriggered(false);
     } finally {
       setIsQuerying(false);
@@ -416,11 +401,6 @@ export function InsightsCard({ view, today, now }: { view: PatientView; today: s
               <Icon name="sparkles" size={14} /> AI Response:
             </div>
             <div>{agentAnswer}</div>
-            {toolsUsed.length > 0 && (
-              <div className={s.agentTools}>
-                Tools used: {toolsUsed.map((t) => <span key={t} className={s.toolChip}>{t}</span>)}
-              </div>
-            )}
             {safeguardTriggered && (
               <div className={s.safeguardTag}>
                 ⚠️ Safeguard triggered: Prescription modifications are prohibited.
