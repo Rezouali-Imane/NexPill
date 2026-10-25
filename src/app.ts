@@ -33,6 +33,17 @@ app.get("/docs.json", (_req, res) => {
   res.json(openApiSpec);
 });
 
+// Root health and welcome endpoint
+app.get("/", (_req, res) => {
+  res.json({
+    status: "ok",
+    service: "NexPill API",
+    version: "1.0.0",
+    docs: "/docs",
+    health: "/health",
+  });
+});
+
 app.use("/health", healthRouter);
 app.use("/auth", authRouter);
 app.use("/medications", medicationRouter);
