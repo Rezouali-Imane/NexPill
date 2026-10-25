@@ -1,0 +1,16 @@
+.scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(27, 58, 66, 0.5); }
+.dialog {
+  position: relative; width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto;
+  background: #fff; border-radius: var(--nx-r-xl); padding: 36px; box-shadow: var(--nx-shadow-modal);
+  animation: pop .16s ease-out;
+}
+@keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+.title { font-size: 1.75rem; line-height: 1.2; letter-spacing: -0.4px; font-weight: 700; padding-right: 48px; }
+.desc { margin-top: 8px; color: var(--nx-muted); font-size: 1.125rem; }
+.close {
+  position: absolute; top: 18px; right: 18px; width: 48px; height: 48px; display: grid; place-items: center;
+  border-radius: var(--nx-r-sm); border: 1px solid var(--nx-line); background: #fff; color: var(--nx-ink);
+}
+.dialog :global(.field) { margin-top: 20px; }
+.dialog :global(.actions) { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+.dialog :global(.actions) > * { flex: 1 1 160px; }

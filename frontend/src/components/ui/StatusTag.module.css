@@ -1,0 +1,10 @@
+.tag {
+  display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: var(--nx-r-full);
+  font-size: 1.0625rem; font-weight: 600; white-space: nowrap;
+}
+.compact { padding: 6px 14px; font-size: 0.875rem; }
+.success { background: var(--nx-success-bg); color: var(--nx-success-ink); }
+.info { background: var(--nx-info); color: var(--nx-primary); }
+.neutral { background: var(--nx-neutral-bg); color: var(--nx-muted); }
+.warning { background: var(--nx-note-bg); color: var(--nx-note-strong); }
+.concern { background: var(--nx-concern-bg); color: var(--nx-concern-ink); }

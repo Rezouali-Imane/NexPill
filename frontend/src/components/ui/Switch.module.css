@@ -1,0 +1,13 @@
+.row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 0; border-top: 1px solid var(--nx-line); }
+.row:first-child { border-top: 0; }
+.label { font-weight: 700; font-size: 1.1875rem; }
+.desc { color: var(--nx-muted); font-size: 1rem; margin-top: 2px; }
+.sw {
+  position: relative; flex: none; min-width: 92px; height: 48px; border-radius: 24px; border: 1.5px solid #b9c6c5;
+  background: #fff; color: var(--nx-muted-strong); display: flex; align-items: center; justify-content: flex-end; padding: 0 14px 0 0;
+  font-weight: 700; font-size: 0.9375rem; transition: background-color .15s;
+}
+.knob { position: absolute; left: 5px; top: 5px; width: 36px; height: 36px; border-radius: 18px; background: #8a9a9d; transition: transform .15s, background-color .15s; }
+.on { background: var(--nx-primary); border-color: var(--nx-primary); color: #fff; justify-content: flex-start; padding: 0 0 0 16px; }
+.on .knob { transform: translateX(44px); background: #fff; }
+.state { pointer-events: none; }

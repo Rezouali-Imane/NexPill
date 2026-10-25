@@ -1,0 +1,22 @@
+.codeBox {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  background: var(--nx-info);
+  border-radius: var(--nx-r-lg);
+  padding: 22px;
+}
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--nx-primary);
+}
+.expiry {
+  flex-basis: 100%;
+  color: var(--nx-muted-strong);
+  font-size: 1rem;
+}

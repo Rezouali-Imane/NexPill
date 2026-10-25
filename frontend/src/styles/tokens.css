@@ -1,0 +1,58 @@
+/* NexPill design tokens — mirror the Figma variables / design system 1:1. */
+:root {
+  /* brand */
+  --nx-primary: #22505a;
+  --nx-ink: #1b3a42;
+  --nx-teal: #5a9aa3;
+  --nx-teal-strong: #4a8a90;
+  --nx-nav: #1c4048;
+  --nx-nav-active: #e1f0ef;
+  --nx-nav-text: #d6e4e3;
+  --nx-nav-muted: #a9c0be;
+  /* surfaces */
+  --nx-bg: #f6f7f5;
+  --nx-card: #ffffff;
+  --nx-panel: #f6f8f7;
+  --nx-panel-2: #f4f7f6;
+  --nx-info: #dcedf0;
+  --nx-line: #e6eae9;
+  /* text */
+  --nx-muted: #5f6f73;
+  --nx-muted-strong: #53646a;
+  /* status */
+  --nx-success-bg: #e3f1ea;
+  --nx-success-ink: #2f6b55;
+  --nx-note-bg: #fdf5e4;
+  --nx-note-ink: #5b5440;
+  --nx-note-strong: #4a3d1b;
+  --nx-refill-bg: #f7f1e6;
+  --nx-refill-line: #efe5d0;
+  --nx-refill-ink: #6b6350;
+  --nx-refill-icon: #8a6b2f;
+  --nx-concern-bg: #fbeaea;
+  --nx-concern-line: #f2c9c9;
+  --nx-concern-ink: #b4443f;
+  --nx-dot: #e5484d;
+  --nx-neutral-bg: #eef1f0;
+  --nx-neutral-icon-bg: #f0f2f1;
+  --nx-avatar-bg: #d9a77c;
+  --nx-avatar-ink: #6b3f1d;
+  --nx-bar: #6aa8a9;
+  --nx-bar-off: #eceeed;
+  /* spacing */
+  --nx-s1: 0.25rem; --nx-s2: 0.5rem; --nx-s3: 0.75rem; --nx-s4: 1rem; --nx-s5: 1.25rem;
+  --nx-s6: 1.5rem; --nx-s8: 2rem; --nx-s10: 2.5rem; --nx-s12: 3rem;
+  /* radius */
+  --nx-r-sm: 14px; --nx-r-md: 18px; --nx-r-lg: 22px; --nx-r-xl: 28px; --nx-r-full: 999px;
+  /* shadow */
+  --nx-shadow-action: 0 10px 22px rgba(34, 80, 90, 0.25);
+  --nx-shadow-soft: 0 6px 18px rgba(34, 80, 90, 0.12);
+  --nx-shadow-modal: 0 24px 60px rgba(27, 58, 66, 0.28);
+  /* type */
+  --nx-font: 'DM Sans Variable', 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* focus */
+  --nx-focus: 0 0 0 3px #fff, 0 0 0 6px var(--nx-primary);
+  --nx-focus-dark: 0 0 0 3px var(--nx-nav), 0 0 0 6px var(--nx-nav-active);
+  /* layout */
+  --nx-sidebar-w: 240px;
+}

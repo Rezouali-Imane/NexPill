@@ -1,0 +1,4 @@
+.card { background: var(--nx-card); border: 1px solid var(--nx-line); border-radius: var(--nx-r-xl); padding: 30px; }
+.info { background: var(--nx-info); border-color: var(--nx-info); overflow: hidden; }
+.refill { background: var(--nx-refill-bg); border-color: var(--nx-refill-line); }
+.eyebrow { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--nx-muted); }

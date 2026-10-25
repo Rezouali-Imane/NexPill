@@ -1,0 +1,13 @@
+.shell { display: flex; min-height: 100vh; align-items: flex-start; }
+.main { flex: 1; min-width: 0; max-width: 1400px; padding: 36px 40px 48px; display: flex; flex-direction: column; gap: 34px; outline: none; }
+.menu { display: none; }
+.backdrop { position: fixed; inset: 0; z-index: 35; background: rgba(27, 58, 66, 0.45); }
+.offline { background: var(--nx-note-bg); color: var(--nx-note-strong); padding: 12px 18px; border-radius: var(--nx-r-sm); font-weight: 600; }
+@media (max-width: 1023px) {
+  .main { padding: 88px 20px 40px; }
+  .menu {
+    display: grid; place-items: center; position: fixed; top: 16px; left: 16px; z-index: 45; width: 52px; height: 52px;
+    background: var(--nx-nav); color: #fff; border: 0; border-radius: var(--nx-r-sm);
+  }
+  .menu:focus-visible { box-shadow: var(--nx-focus); }
+}

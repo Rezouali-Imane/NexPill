@@ -1,0 +1,5 @@
+.faq details { border-top: 1px solid var(--nx-line); padding: 6px 0; }
+.faq details:first-child { margin-top: 16px; }
+.faq summary { cursor: pointer; font-weight: 700; font-size: 1.1875rem; min-height: 52px; display: flex; align-items: center; list-style-position: inside; }
+.faq summary:focus-visible { box-shadow: var(--nx-focus); }
+.faq p { color: var(--nx-muted-strong); padding: 0 0 16px; }

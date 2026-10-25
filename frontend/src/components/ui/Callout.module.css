@@ -1,0 +1,5 @@
+.callout { border-radius: var(--nx-r-md); padding: 18px 22px; font-size: 1.125rem; line-height: 1.5; }
+.note { background: var(--nx-note-bg); color: var(--nx-note-ink); }
+.note strong { color: var(--nx-note-strong); }
+.info { background: var(--nx-info); color: var(--nx-ink); }
+.concern { background: var(--nx-concern-bg); color: var(--nx-concern-ink); }
