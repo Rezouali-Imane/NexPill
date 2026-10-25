@@ -27,6 +27,15 @@ app.use(
 );
 app.use(express.json());
 
+// Production request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    console.log(`[HTTP] ${req.method} ${req.originalUrl} ${res.statusCode} (${Date.now() - start}ms)`);
+  });
+  next();
+});
+
 // API Documentation (Swagger UI)
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 app.get("/docs.json", (_req, res) => {
