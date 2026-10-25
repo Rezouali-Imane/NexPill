@@ -11,7 +11,6 @@ import {
 } from "@/caregiver/CaregiverStore";
 import {
   ActivityCard,
-  AttentionBanner,
   DaySummary,
   InsightsCard,
   LiveStatus,
@@ -30,7 +29,7 @@ export function CaregiverBell({ count }: { count: number }) {
       className={s.bellLink}
       aria-label={count ? `Alerts, ${count} new` : "Alerts, none new"}
     >
-      <Icon name="bell" />
+      <Icon name="bell" size={18} />
       {count > 0 && <span className={s.bellDot} aria-hidden="true" />}
     </Link>
   );
@@ -79,7 +78,7 @@ export default function Dashboard() {
             and find their NexPill ID. Enter it here and you will see their
             updates straight away.
           </p>
-          <div style={{ marginTop: 20 }}>
+          <div style={{ marginTop: 16 }}>
             <Link to="/caregiver/patients?add=1">
               <Button size="md" variant="primary" tabIndex={-1}>
                 Enter a patient ID
@@ -105,12 +104,6 @@ export default function Dashboard() {
       />
       <div className={s.grid}>
         <div className={s.col}>
-          <AttentionBanner
-            view={v}
-            today={d.today}
-            now={now}
-            caregiverFirst="you"
-          />
           <DaySummary view={v} today={d.today} now={now} />
           <TimelineCard view={v} today={d.today} now={now} />
           <WeekCard view={v} today={d.today} now={now} />

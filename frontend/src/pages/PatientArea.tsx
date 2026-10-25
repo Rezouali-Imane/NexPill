@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import { PatientProvider, usePatientActions, usePatientState } from '@/state/PatientStore';
 
 function Shell() {
-  const { status, error, data } = usePatientState();
+  const { status, data } = usePatientState();
   const { reload } = usePatientActions();
   const size = data?.settings.textSize;
   // Applies the patient's "larger text" setting.
@@ -14,14 +14,24 @@ function Shell() {
     if (size) document.documentElement.dataset.textSize = size;
     return () => { delete document.documentElement.dataset.textSize; };
   }, [size]);
-  if (status === 'loading') return <p role="status" style={{ padding: 40, fontSize: '1.25rem' }}>Loading your medication plan…</p>;
-  if (status === 'error')
+
+  if (status === 'loading') {
     return (
-      <div role="alert" style={{ padding: 40, display: 'grid', gap: 16, justifyItems: 'start' }}>
-        <p style={{ fontSize: '1.25rem' }}>{error ?? 'We could not load your plan.'}</p>
-        <Button size="md" variant="primary" onClick={() => void reload()}>Try again</Button>
+      <div style={{ padding: '32px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <p style={{ fontSize: '0.9375rem', color: 'var(--nx-muted)' }}>Loading your medication plan…</p>
       </div>
     );
+  }
+
+  if (status === 'error' && !data) {
+    return (
+      <div style={{ padding: '32px 24px', display: 'grid', gap: 12, justifyItems: 'start' }}>
+        <p style={{ fontSize: '0.9375rem', color: 'var(--nx-muted)' }}>Could not load medication plan. Reconnecting…</p>
+        <Button size="md" variant="primary" onClick={() => void reload()}>Retry</Button>
+      </div>
+    );
+  }
+
   return <AppShell primary={PATIENT_NAV} secondary={PATIENT_NAV_SECONDARY} caption="Patient profile" />;
 }
 

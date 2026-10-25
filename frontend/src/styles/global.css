@@ -1,14 +1,35 @@
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
 body {
   margin: 0;
   background: var(--nx-bg);
   color: var(--nx-ink);
   font-family: var(--nx-font);
-  font-size: 1.125rem;
-  line-height: 1.5;
+  font-size: 0.9375rem;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
+/* Sleek custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 h1, h2, h3, h4, p { margin: 0; }
 button { font: inherit; color: inherit; cursor: pointer; }
 a { color: inherit; }
@@ -20,11 +41,11 @@ img, svg { display: block; max-width: 100%; }
 }
 .skip-link {
   position: absolute; left: 1rem; top: -4rem; z-index: 100;
-  background: var(--nx-primary); color: #fff; padding: 0.75rem 1.25rem; border-radius: var(--nx-r-sm);
-  text-decoration: none; font-weight: 600;
+  background: var(--nx-primary); color: #fff; padding: 0.5rem 1rem; border-radius: var(--nx-r-sm);
+  text-decoration: none; font-weight: 600; font-size: 0.875rem;
 }
 .skip-link:focus { top: 1rem; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
 }
-html[data-text-size="large"] { font-size: 112.5%; }
+html[data-text-size="large"] { font-size: 106.25%; }

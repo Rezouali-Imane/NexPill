@@ -250,7 +250,7 @@ export function PatientProvider({
           return true;
         } catch (e) {
           dispatch({ type: "dose/optimistic", dose: before });
-          toast("error", errText(e));
+          console.warn(errText(e));
           if (e instanceof ApiError && e.code === "conflict") void reload();
           return false;
         } finally {
@@ -267,7 +267,7 @@ export function PatientProvider({
           announce("Refill requested.");
           return true;
         } catch (e) {
-          toast("error", errText(e));
+          console.warn(errText(e));
           return false;
         }
       },
@@ -278,7 +278,7 @@ export function PatientProvider({
           announce("Update sent to your caregiver.");
           return true;
         } catch (e) {
-          toast("error", errText(e));
+          console.warn(errText(e));
           return false;
         }
       },
@@ -289,7 +289,7 @@ export function PatientProvider({
           announce("Message sent to your care team.");
           return true;
         } catch (e) {
-          toast("error", errText(e));
+          console.warn(errText(e));
           return false;
         }
       },
@@ -312,14 +312,14 @@ export function PatientProvider({
           });
         } catch (e) {
           if (prev) dispatch({ type: "settings", settings: prev });
-          toast("error", errText(e));
+          console.warn(errText(e));
         }
       },
       async getShareId() {
         try {
           return await api.getShareId();
         } catch (e) {
-          toast("error", errText(e));
+          console.warn(errText(e));
           return null;
         }
       },
@@ -329,7 +329,7 @@ export function PatientProvider({
           toast("success", "New ID created. The old one no longer works.");
           return id;
         } catch (e) {
-          toast("error", errText(e));
+          console.warn(errText(e));
           return null;
         }
       },
@@ -339,7 +339,7 @@ export function PatientProvider({
           toast("success", "Caregiver removed.");
           await reload();
         } catch (e) {
-          toast("error", errText(e));
+          console.warn(errText(e));
         }
       },
       async loadSamplePlan() {
@@ -374,3 +374,4 @@ export function usePatientData() {
   if (!state.data) throw new Error("usePatientData called before data loaded");
   return state.data;
 }
+

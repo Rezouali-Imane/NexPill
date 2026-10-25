@@ -7,10 +7,26 @@ import { Button } from '@/components/ui/Button';
 
 function Shell() {
   const { now } = useNow();
-  const { status, error } = useCaregiverState();
+  const { status, data } = useCaregiverState();
   const { unseen } = useCaregiverData(now);
-  if (status === 'loading') return <p role="status" style={{ padding: 40, fontSize: '1.25rem' }}>Loading your patients…</p>;
-  if (status === 'error') return <div role="alert" style={{ padding: 40 }}><p style={{ fontSize: '1.25rem', marginBottom: 16 }}>{error}</p><Button size="md" variant="primary" onClick={() => location.reload()}>Try again</Button></div>;
+
+  if (status === 'loading') {
+    return (
+      <div style={{ padding: '32px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <p style={{ fontSize: '0.9375rem', color: 'var(--nx-muted)' }}>Loading patient overview…</p>
+      </div>
+    );
+  }
+
+  if (status === 'error' && !data) {
+    return (
+      <div style={{ padding: '32px 24px', display: 'grid', gap: 12, justifyItems: 'start' }}>
+        <p style={{ fontSize: '0.9375rem', color: 'var(--nx-muted)' }}>Could not load patient dashboard. Reconnecting…</p>
+        <Button size="md" variant="primary" onClick={() => location.reload()}>Retry</Button>
+      </div>
+    );
+  }
+
   const nav = CAREGIVER_NAV.map((i) => (i.to === '/caregiver/alerts' ? { ...i, badge: unseen.length } : i));
   return <AppShell primary={nav} secondary={CAREGIVER_NAV_SECONDARY} caption="Caregiver" />;
 }

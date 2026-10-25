@@ -258,7 +258,7 @@ export function CaregiverProvider({
           toast("success", "Patient removed.");
           await reload();
         } catch (e) {
-          toast("error", errText(e));
+          console.warn(errText(e));
         }
       },
       async markSeen(patientId) {
@@ -273,7 +273,7 @@ export function CaregiverProvider({
         try {
           await api.acknowledgeAlerts(ids);
         } catch (e) {
-          toast("error", errText(e));
+          console.warn(errText(e));
           void reload();
         }
       },
@@ -284,7 +284,7 @@ export function CaregiverProvider({
           announce("Message sent.");
           return true;
         } catch (e) {
-          toast("error", errText(e));
+          console.warn(errText(e));
           return false;
         }
       },
@@ -295,7 +295,7 @@ export function CaregiverProvider({
           announce(`Extra reminder added for ${time}.`);
           return true;
         } catch (e) {
-          toast("error", errText(e));
+          console.warn(errText(e));
           return false;
         }
       },
@@ -351,3 +351,4 @@ export function useCaregiverData(now: Date) {
     };
   }, [data, now, state.selectedId]);
 }
+

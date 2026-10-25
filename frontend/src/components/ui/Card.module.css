@@ -1,4 +1,12 @@
-.card { background: var(--nx-card); border: 1px solid var(--nx-line); border-radius: var(--nx-r-xl); padding: 30px; }
+.card {
+  background: var(--nx-card);
+  border: 1px solid var(--nx-line);
+  border-radius: var(--nx-r-lg);
+  padding: 16px 18px;
+}
 .info { background: var(--nx-info); border-color: var(--nx-info); overflow: hidden; }
 .refill { background: var(--nx-refill-bg); border-color: var(--nx-refill-line); }
-.eyebrow { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--nx-muted); }
+.eyebrow { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--nx-muted); }
+@media (max-width: 640px) {
+  .card { padding: 12px 14px; }
+}

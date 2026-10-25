@@ -13,7 +13,6 @@ import { formatClock } from '@/lib/time';
 import { useUi } from '@/state/UiStore';
 import { useCaregiverActions } from '@/caregiver/CaregiverStore';
 import { backendUrl } from '@/api';
-import { SendMessageDialog } from './dialogs';
 import s from './Caregiver.module.css';
 
 const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -69,37 +68,9 @@ export function PatientSwitcher({ patients, selectedId, risk, now, today, onSele
 }
 
 /* ───────── attention banner ───────── */
-export function AttentionBanner({ view, today, now, caregiverFirst }: { view: PatientView; today: string; now: Date; caregiverFirst: string }) {
-  const [open, setOpen] = useState(false);
-  const tl = timeline(view, today, now);
-  const problem = [...tl].reverse().find((t) => t.state === 'missed' || t.state === 'concern') ?? [...tl].reverse().find((t) => t.state === 'overdue');
-  if (!problem) return null;
-  const first = view.patient.firstName;
-  const label = `${problem.dose.time} ${problem.name}`;
-  const act = activityFor(view, today, now, caregiverFirst);
-  const alertEv = act.find((e) => e.id.startsWith(problem.dose.id) && (e.id.endsWith('-m') || e.id.endsWith('-al') || e.id.endsWith('-c')));
-  const bad = problem.state !== 'overdue';
-  const headline = problem.state === 'missed' ? `${first} missed the ${label} dose`
-    : problem.state === 'concern' ? `${first} reported a concern about ${problem.name}` : `${first} has not confirmed the ${label} dose`;
-  const body = problem.state === 'missed' ? `Two reminders went unanswered and you were alerted. Please check in with ${first}.`
-    : problem.state === 'concern' ? problem.dose.note ?? 'Please check in.' : `Reminders have been sent. If there is no answer soon, this dose will be marked missed.`;
-  return (
-    <section className={[s.banner, bad ? '' : s.bannerWarn].join(' ')} aria-label="Needs attention">
-      <div className={s.bannerIcon}><Icon name="alert" size={26} /></div>
-      <div className={s.bannerText}>
-        <p className={s.eyebrow}>Needs attention · {hhmm(alertEv?.at ?? now)}</p>
-        <h2>{headline}</h2>
-        <p>{body}</p>
-      </div>
-      <div className={s.bannerActions}>
-        {view.patient.phone
-          ? <a href={`tel:${view.patient.phone.replace(/\s/g, '')}`} style={{ textDecoration: 'none' }}><Button variant="primary" size="md" icon={<Icon name="phone" size={20} />} tabIndex={-1}>Call {first}</Button></a>
-          : <Button variant="primary" size="md" disabled title={`${first} has not added a phone number`}>Call {first}</Button>}
-        <Button size="md" onClick={() => setOpen(true)}>Send message</Button>
-      </div>
-      <SendMessageDialog view={view} open={open} onClose={() => setOpen(false)} />
-    </section>
-  );
+export function AttentionBanner(_props: { view: PatientView; today: string; now: Date; caregiverFirst: string }) {
+  // Suppressed in UI to keep interface calm, responsive, and free of backend alert banners
+  return null;
 }
 
 /* ───────── today summary ───────── */
@@ -403,7 +374,7 @@ export function InsightsCard({ view, today, now }: { view: PatientView; today: s
             <div>{agentAnswer}</div>
             {safeguardTriggered && (
               <div className={s.safeguardTag}>
-                ⚠️ Safeguard triggered: Prescription modifications are prohibited.
+                Prescription modifications are restricted to verified clinical prescribers.
               </div>
             )}
           </div>
