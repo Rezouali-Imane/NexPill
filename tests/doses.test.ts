@@ -314,6 +314,59 @@ describe("Dose Endpoints (/doses)", () => {
       expect(response.status).toBe(400);
       expect(response.body.error).toContain("CANCELLED");
     });
+
+    it("allows late confirmation of a MISSED dose, resolving alerts and cancelling reminders", async () => {
+      authenticateAs(patientId);
+      mockPrisma.scheduledDose.findUnique.mockResolvedValueOnce({
+        ...sampleDose,
+        status: "MISSED",
+      });
+
+      const updatedDose = {
+        ...sampleDose,
+        status: "TAKEN",
+        resolvedAt: new Date(),
+        resolvedSource: "PATIENT",
+        version: 1,
+      };
+
+      const mockEvent = {
+        id: "evt-late",
+        doseId,
+        fromStatus: "MISSED",
+        toStatus: "TAKEN",
+        source: "PATIENT",
+        occurredAt: new Date(),
+        recordedAt: new Date(),
+      };
+
+      mockPrisma.$transaction.mockImplementationOnce(async (callback) => {
+        const tx = {
+          scheduledDose: {
+            findUnique: vi.fn().mockResolvedValue({ status: "MISSED" }),
+            update: vi.fn().mockResolvedValue(updatedDose),
+          },
+          doseEvent: {
+            create: vi.fn().mockResolvedValue(mockEvent),
+          },
+          caregiverAlert: {
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          },
+          notification: {
+            updateMany: vi.fn().mockResolvedValue({ count: 2 }),
+          },
+        };
+        return callback(tx);
+      });
+
+      const response = await request(app)
+        .post(`/doses/${doseId}/taken`)
+        .set("Authorization", "Bearer valid-token")
+        .send({ note: "Took dose late" });
+
+      expect(response.status).toBe(200);
+      expect(response.body.dose.status).toBe("TAKEN");
+    });
   });
 
   describe("POST /doses/:id/skipped", () => {
@@ -426,6 +479,18 @@ describe("Dose Endpoints (/doses)", () => {
   });
 
   describe("GET /doses", () => {
+    it("rejects invalid status query parameter with 400 Bad Request", async () => {
+      authenticateAs(patientId);
+
+      const response = await request(app)
+        .get("/doses")
+        .query({ status: "NOT_A_DOSE_STATUS" })
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain("Invalid dose status");
+    });
+
     it("lists doses for authenticated patient with filters", async () => {
       authenticateAs(patientId);
       mockPrisma.scheduledDose.findMany.mockResolvedValueOnce([sampleDose]);

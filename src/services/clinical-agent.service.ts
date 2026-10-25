@@ -19,7 +19,7 @@ export const CLINICAL_DISCLAIMER =
 
 export const DEMO_AHMED_PATIENT_ID = "00000000-0000-4000-8000-000000000001";
 
-interface PatternToolResult {
+interface PatternToolResult extends Record<string, unknown> {
   metrics: {
     confirmationRate: number;
     confirmedCount: number;
@@ -50,7 +50,7 @@ interface MedicationInfoToolResult {
   synonyms?: string[];
 }
 
-interface SummaryToolResult {
+interface SummaryToolResult extends Record<string, unknown> {
   summaryText?: string;
 }
 

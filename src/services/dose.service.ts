@@ -336,7 +336,18 @@ export class DoseService {
       patientId: targetPatientId,
     };
 
+    const validDoseStatuses: DoseStatus[] = [
+      "PENDING",
+      "TAKEN",
+      "SKIPPED",
+      "UNABLE_TO_TAKE",
+      "MISSED",
+      "CANCELLED",
+    ];
     if (query.status) {
+      if (!validDoseStatuses.includes(query.status)) {
+        throw new BadRequestError(`Invalid dose status "${query.status}".`);
+      }
       where.status = query.status;
     }
 
