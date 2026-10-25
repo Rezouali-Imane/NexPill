@@ -1,11 +1,31 @@
-import type { Backend } from './client';
-import { mockBackend } from './mock';
+import type { Backend } from "./client";
+import { mockBackend } from "./mock";
+import { createHttpBackend } from "./http/client";
 
 /**
- * Single composition point. When the real backend is ready, build a Backend from
- * fetch() + WebSocket (see docs/API.md) and return it here when VITE_API_URL is set.
+ * Single composition point.
+ * Reads VITE_API_URL or localStorage override.
+ * When set, routes requests to the live backend and connects via Socket.io.
+ * When unset, seamlessly falls back to the in-browser mock backend.
  */
-export const backend: Backend = mockBackend;
-export { mockRealtime } from './mockRealtime';
-export { ApiError } from './client';
-export type { AuthApi, Backend, CaregiverApi, PatientApi, RealtimeChannel } from './client';
+const configuredUrl =
+  (typeof window !== "undefined" && window.localStorage.getItem("nexpill_api_url")) ||
+  import.meta.env.VITE_API_URL;
+
+export const isLiveBackend = Boolean(configuredUrl);
+export const backendUrl = configuredUrl || "http://localhost:3000";
+
+export const backend: Backend = configuredUrl
+  ? createHttpBackend(configuredUrl)
+  : mockBackend;
+
+export { mockRealtime } from "./mockRealtime";
+export { ApiError } from "./client";
+export type {
+  AuthApi,
+  Backend,
+  CaregiverApi,
+  CaregiverDashboard,
+  PatientApi,
+  RealtimeChannel,
+} from "./client";

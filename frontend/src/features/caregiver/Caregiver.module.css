@@ -1,6 +1,6 @@
 .grid { display: flex; gap: 26px; align-items: flex-start; }
 .col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 26px; }
-.side { width: 330px; flex: none; display: flex; flex-direction: column; gap: 26px; }
+.side { width: 350px; flex: none; display: flex; flex-direction: column; gap: 26px; }
 @media (max-width: 1279px) { .grid { flex-direction: column; } .side { width: 100%; } }
 .h2 { font-size: 1.75rem; letter-spacing: -0.4px; font-weight: 700; line-height: 1.2; }
 .sub { color: var(--nx-muted); font-size: 1.0625rem; margin-top: 6px; }
@@ -103,17 +103,28 @@
 
 /* insights */
 .insHead { display: flex; gap: 14px; align-items: center; }
-.insIcon { width: 48px; height: 48px; border-radius: 14px; background: var(--nx-info); color: var(--nx-primary); display: grid; place-items: center; flex: none; }
-.riskRow { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; gap: 10px; }
+.insIcon { width: 48px; height: 48px; border-radius: 14px; background: #e0f2fe; color: #0284c7; display: grid; place-items: center; flex: none; }
+.aiBadge { display: inline-flex; align-items: center; gap: 6px; background: #f3e8ff; color: #7e22ce; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 10px; border-radius: 12px; border: 1px solid #e9d5ff; }
+.riskRow { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; gap: 10px; }
 .meter { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 12px; }
 .seg { height: 8px; border-radius: 4px; background: var(--nx-bar-off); }
 .seg.on0 { background: var(--nx-success-ink); } .seg.on1 { background: #d9a030; } .seg.on2 { background: var(--nx-concern-ink); }
 .meterLabels { display: grid; grid-template-columns: repeat(3, 1fr); font-size: 0.8125rem; color: var(--nx-muted); margin-top: 6px; text-align: center; }
 .meterLabels .cur { color: var(--nx-ink); font-weight: 700; }
 .why { margin: 12px 0 0; padding: 0 0 0 20px; display: grid; gap: 8px; color: var(--nx-muted-strong); font-size: 1rem; }
-.suggest { margin-top: 18px; background: var(--nx-panel); border-radius: var(--nx-r-md); padding: 18px; }
+.suggest { margin-top: 18px; background: var(--nx-panel); border-radius: var(--nx-r-md); padding: 18px; border: 1px solid var(--nx-line); }
 .suggest b { display: block; font-size: 1.0625rem; }
 .suggest p { color: var(--nx-muted-strong); font-size: 0.9375rem; margin-top: 4px; }
 .suggest .row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-.disclaimer { margin-top: 16px; color: var(--nx-muted); font-size: 0.875rem; }
-.h3 { font-size: 1.1875rem; font-weight: 700; margin-top: 22px; }
+.disclaimer { margin-top: 16px; color: var(--nx-muted); font-size: 0.875rem; line-height: 1.4; border-top: 1px solid var(--nx-line); padding-top: 12px; }
+.h3 { font-size: 1.1875rem; font-weight: 700; margin-top: 20px; }
+
+/* Interactive AI Agent section */
+.agentSection { margin-top: 20px; border-top: 1px solid var(--nx-line); padding-top: 18px; }
+.agentQueryRow { display: flex; gap: 8px; margin-top: 10px; }
+.agentInput { flex: 1; min-width: 0; padding: 10px 14px; border: 1.5px solid var(--nx-line); border-radius: var(--nx-r-md); font-size: 0.9375rem; font-family: inherit; }
+.agentInput:focus { outline: none; border-color: var(--nx-primary); }
+.agentResult { margin-top: 14px; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: var(--nx-r-md); padding: 14px; font-size: 0.9375rem; line-height: 1.45; color: #3b0764; }
+.agentTools { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; font-size: 0.75rem; color: #6b21a8; font-family: monospace; }
+.toolChip { background: #f3e8ff; padding: 2px 6px; border-radius: 4px; border: 1px solid #d8b4fe; }
+.safeguardTag { display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #991b1b; padding: 3px 8px; border-radius: 6px; font-size: 0.8125rem; font-weight: 600; margin-top: 6px; }
