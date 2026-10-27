@@ -25,7 +25,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 24px;
+  gap: 20px;
 }
 
 .logoWrap {
@@ -34,7 +34,7 @@
 }
 
 .logoWrap img {
-  width: 175px;
+  width: 160px;
   height: auto;
   display: block;
 }
