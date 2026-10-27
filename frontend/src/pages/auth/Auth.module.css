@@ -3,40 +3,61 @@
   height: 100dvh;
   overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(280px, 4fr) 7fr;
+  grid-template-columns: minmax(300px, 4fr) 7fr;
   background: var(--nx-bg);
 }
 
 .brand {
   background: var(--nx-nav);
   color: #fff;
-  padding: 36px 40px;
+  padding: 48px 52px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
   align-items: flex-start;
   overflow: hidden;
+  position: relative;
+}
+
+.brandContent {
+  width: 100%;
+  max-width: 28rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.logoWrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.logoWrap img {
+  width: 175px;
+  height: auto;
+  display: block;
 }
 
 .pitch {
   align-self: stretch;
-  margin-top: auto;
-  margin-bottom: 24px;
 }
 
 .pitch h2 {
-  font-size: 1.875rem;
+  font-size: 2.15rem;
   line-height: 1.15;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.6px;
   font-weight: 700;
+  color: #ffffff;
+  margin: 0;
 }
 
 .pitch p {
-  margin-top: 10px;
-  font-size: 1rem;
+  margin-top: 12px;
+  font-size: 1.05rem;
   color: var(--nx-nav-text);
-  max-width: 24rem;
-  line-height: 1.45;
+  line-height: 1.5;
+  max-width: 25rem;
 }
 
 .main {
@@ -221,14 +242,24 @@
     overflow-y: auto;
   }
   .brand {
-    padding: 24px 20px;
+    padding: 28px 20px 20px;
+    align-items: center;
+  }
+  .brandContent {
+    align-items: center;
+    text-align: center;
     gap: 16px;
   }
-  .pitch p {
-    display: none;
+  .logoWrap img {
+    width: 135px;
   }
   .pitch h2 {
     font-size: 1.35rem;
+  }
+  .pitch p {
+    font-size: 0.9rem;
+    margin-top: 6px;
+    max-width: 22rem;
   }
   .card {
     padding: 22px 18px;

@@ -21,12 +21,16 @@ export function AuthLayout({
         Skip to form
       </a>
       <aside className={s.brand}>
-        <Logo />
-        <div className={s.pitch}>
-          <h2>Medication, made calm.</h2>
-          <p>
-            Gentle reminders for patients. Peace of mind for the people who care for them.
-          </p>
+        <div className={s.brandContent}>
+          <div className={s.logoWrap}>
+            <Logo />
+          </div>
+          <div className={s.pitch}>
+            <h2>Medication, made calm.</h2>
+            <p>
+              Gentle reminders for patients. Peace of mind for the people who care for them.
+            </p>
+          </div>
         </div>
       </aside>
       <main id="auth-main" className={s.main}>
