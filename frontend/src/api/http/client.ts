@@ -573,9 +573,15 @@ export function createHttpBackend(baseUrl: string): Backend {
       if (this.socket) return;
       this.setState("connecting");
 
+      const token =
+        (typeof sessionStorage !== "undefined" && sessionStorage.getItem("nexpill_token")) ||
+        (typeof localStorage !== "undefined" && localStorage.getItem("nexpill_token")) ||
+        "";
+
       this.socket = io(cleanUrl, {
         transports: ["websocket", "polling"],
         reconnectionAttempts: 5,
+        auth: token ? { token } : undefined,
       });
 
       this.socket.on("connect", () => {
@@ -590,30 +596,49 @@ export function createHttpBackend(baseUrl: string): Backend {
         this.setState("reconnecting");
       });
 
-      this.socket.on("dose.status_changed", (data: {
+      const handleDoseUpdated = (data: {
         patientId: string;
         doseId: string;
-        medicationId: string;
-        scheduledAt: string;
-        localDate: string;
-        toStatus: BackendDose["status"];
+        medicationId?: string;
+        scheduleId?: string;
+        scheduledAt?: string;
+        localDate?: string;
+        status?: string;
+        toStatus?: BackendDose["status"];
         recordedAt?: string;
+        occurredAt?: string;
         note?: string;
       }) => {
+        const rawStatus = (data.status || data.toStatus || "TAKEN").toUpperCase();
+        const mappedStatus: BackendDose["status"] =
+          rawStatus === "TAKEN"
+            ? "TAKEN"
+            : rawStatus === "SKIPPED"
+              ? "SKIPPED"
+              : rawStatus === "MISSED"
+                ? "MISSED"
+                : "PENDING";
+
         const dose = mapBackendDose({
           id: data.doseId,
-          scheduleId: data.medicationId,
+          scheduleId: data.scheduleId || data.medicationId || "generic-schedule",
           patientId: data.patientId,
-          scheduledAt: data.scheduledAt,
-          localDate: data.localDate,
-          status: data.toStatus,
-          resolvedAt: data.recordedAt,
+          scheduledAt: data.scheduledAt || new Date().toISOString(),
+          localDate: data.localDate || new Date().toISOString().slice(0, 10),
+          status: mappedStatus,
+          resolvedAt:
+            data.recordedAt ||
+            data.occurredAt ||
+            (mappedStatus === "TAKEN" ? new Date().toISOString() : undefined),
           resolvedSource: "SYSTEM",
           note: data.note,
         });
 
         this.emitEvent({ type: "dose.updated", dose }, data.patientId);
-      });
+      };
+
+      this.socket.on("dose.updated", handleDoseUpdated);
+      this.socket.on("dose.status_changed", handleDoseUpdated);
 
       this.socket.on("alert.created", (data: {
         patientId: string;

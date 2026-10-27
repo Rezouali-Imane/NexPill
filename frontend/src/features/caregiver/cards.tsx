@@ -244,6 +244,12 @@ export function InsightsCard({ view, today, now }: { view: PatientView; today: s
         localStorage.getItem('nexpill_token') ||
         '';
 
+      const isDemo =
+        view.patient.id === '00000000-0000-4000-8000-000000000001' ||
+        view.patient.id === 'demo-ahmed' ||
+        view.patient.id.startsWith('p-') ||
+        !view.patient.id.includes('-');
+
       const res = await fetch(`${backendUrl}/agent/query`, {
         method: 'POST',
         headers: {
@@ -253,18 +259,23 @@ export function InsightsCard({ view, today, now }: { view: PatientView; today: s
         body: JSON.stringify({
           query: q,
           patientId: view.patient.id,
-          useDemoData: true,
+          useDemoData: isDemo,
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
-        setAgentAnswer(data.answer);
+        setAgentAnswer(data.response || data.answer);
         setSafeguardTriggered(Boolean(data.safeguardTriggered));
       } else {
-        setAgentAnswer(
-          `Clinical Analysis for ${first}: Morning doses show steady adherence (90%+). Evening slots show repeated delays past 18:00. Suggested adjustment: coordinate evening reminder with dinner routine.`,
-        );
+        const errData = await res.json().catch(() => null);
+        if (errData?.error) {
+          setAgentAnswer(errData.error);
+        } else {
+          setAgentAnswer(
+            `Clinical Analysis for ${first}: Morning doses show steady adherence (90%+). Evening slots show repeated delays past 18:00. Suggested adjustment: coordinate evening reminder with dinner routine.`,
+          );
+        }
         setSafeguardTriggered(false);
       }
     } catch {
