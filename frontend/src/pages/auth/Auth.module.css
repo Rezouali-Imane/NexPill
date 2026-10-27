@@ -1,215 +1,207 @@
 .page {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(320px, 4fr) 7fr;
+  grid-template-columns: minmax(280px, 4fr) 7fr;
   background: var(--nx-bg);
 }
 
 .brand {
   background: var(--nx-nav);
   color: #fff;
-  padding: 48px 48px 40px;
+  padding: 36px 40px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  align-items: center;
-  gap: 40px;
-}
-.pitch h2 {
-  font-size: 2.5rem;
-  line-height: 1.15;
-  letter-spacing: -1px;
-  font-weight: 700;
-}
-.pitch p {
-  margin-top: 14px;
-  font-size: 1.25rem;
-  color: var(--nx-nav-text);
-  max-width: 28rem;
-}
-.pitch ul {
-  margin: 28px 0 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 12px;
-  color: var(--nx-nav-text);
-  font-size: 1.125rem;
-}
-.pitch li::before {
-  content: "✓";
-  display: inline-grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  margin-right: 12px;
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  font-size: 0.9rem;
+  align-items: flex-start;
+  overflow: hidden;
 }
 
 .pitch {
   align-self: stretch;
-  margin-bottom: 180px;
+  margin-top: auto;
+  margin-bottom: 24px;
+}
+
+.pitch h2 {
+  font-size: 1.875rem;
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+  font-weight: 700;
+}
+
+.pitch p {
+  margin-top: 10px;
+  font-size: 1rem;
+  color: var(--nx-nav-text);
+  max-width: 24rem;
+  line-height: 1.45;
 }
 
 .main {
-  display: grid;
-  place-items: center;
-  padding: 40px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 24px;
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
+
 .card {
-  width: min(480px, 100%);
+  width: min(440px, 100%);
   background: #fff;
   border: 1px solid var(--nx-line);
-  border-radius: var(--nx-r-xl);
-  padding: 40px;
+  border-radius: var(--nx-r-lg);
+  padding: 26px 30px;
   box-shadow: var(--nx-shadow-soft);
+  max-height: 94vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
+
 .wide {
-  width: min(640px, 100%);
+  width: min(560px, 100%);
 }
+
 .title {
-  font-size: 2rem;
+  font-size: 1.5rem;
   line-height: 1.2;
   letter-spacing: -0.5px;
   font-weight: 700;
 }
+
 .sub {
-  margin-top: 8px;
+  margin-top: 4px;
   color: var(--nx-muted);
-  font-size: 1.125rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
+
 .form {
   display: grid;
-  gap: 20px;
-  margin-top: 28px;
+  gap: 12px;
+  margin-top: 16px;
 }
+
 .row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 12px;
 }
+
 .footer {
-  margin-top: 28px;
-  padding-top: 22px;
+  margin-top: 16px;
+  padding-top: 12px;
   border-top: 1px solid var(--nx-line);
   color: var(--nx-muted-strong);
-  font-size: 1.0625rem;
+  font-size: 0.9rem;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
+
 .footer a,
 .link {
   color: var(--nx-primary);
   font-weight: 600;
 }
+
 .alert {
   background: var(--nx-concern-bg);
   border: 1px solid var(--nx-concern-line);
   color: var(--nx-concern-ink);
   border-radius: var(--nx-r-sm);
-  padding: 14px 16px;
+  padding: 10px 14px;
   font-weight: 600;
+  font-size: 0.9rem;
 }
+
 .okbox {
   background: var(--nx-success-bg);
   color: var(--nx-success-ink);
   border-radius: var(--nx-r-sm);
-  padding: 16px;
+  padding: 12px 14px;
   font-weight: 600;
+  font-size: 0.9rem;
 }
+
 .roles {
   display: grid;
-  gap: 14px;
-  margin-top: 24px;
+  gap: 10px;
+  margin-top: 14px;
   border: 0;
   padding: 0;
 }
+
 .roles legend {
   font-weight: 700;
-  font-size: 1.1875rem;
-  margin-bottom: 4px;
+  font-size: 1.05rem;
+  margin-bottom: 2px;
   padding: 0;
 }
+
 .role {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   align-items: center;
   text-align: left;
-  padding: 18px 20px;
+  padding: 12px 14px;
   border-radius: var(--nx-r-md);
   border: 2px solid var(--nx-line);
   background: #fff;
-  min-height: 88px;
+  min-height: 64px;
   cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
+
 .role:has(input:checked) {
   border-color: var(--nx-primary);
   background: var(--nx-info);
 }
+
 .role:has(input:focus-visible) {
   box-shadow: var(--nx-focus);
 }
+
 .role input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
+
 .roleIcon {
-  width: 52px;
-  height: 52px;
-  border-radius: 26px;
+  width: 42px;
+  height: 42px;
+  border-radius: 21px;
   background: var(--nx-info);
   display: grid;
   place-items: center;
   color: var(--nx-primary);
   flex: none;
 }
+
 .role:has(input:checked) .roleIcon {
   background: var(--nx-primary);
   color: #fff;
 }
+
 .role b {
   display: block;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
 }
+
 .role span span {
   color: var(--nx-muted);
-  font-size: 1.0625rem;
+  font-size: 0.85rem;
 }
+
 .actions {
   display: grid;
-  gap: 12px;
-  margin-top: 24px;
+  gap: 10px;
+  margin-top: 16px;
 }
-.demo {
-  margin-top: 24px;
-  background: var(--nx-note-bg);
-  color: var(--nx-note-ink);
-  border-radius: var(--nx-r-md);
-  padding: 16px 18px;
-  font-size: 1rem;
-}
-.demo b {
-  color: var(--nx-note-strong);
-}
-.demo button {
-  background: none;
-  border: 0;
-  padding: 0;
-  text-decoration: underline;
-  font-weight: 600;
-  color: var(--nx-primary);
-  min-height: 32px;
-}
-.code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: #fff;
-  border-radius: 8px;
-  padding: 2px 8px;
-}
+
 .back {
   display: inline-flex;
   align-items: center;
@@ -217,26 +209,29 @@
   color: var(--nx-muted-strong);
   text-decoration: none;
   font-weight: 600;
-  margin-bottom: 20px;
-  min-height: 44px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
 }
+
 @media (max-width: 900px) {
   .page {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
   }
   .brand {
-    padding: 28px 24px;
-    gap: 20px;
+    padding: 24px 20px;
+    gap: 16px;
   }
-  .pitch ul,
   .pitch p {
     display: none;
   }
   .pitch h2 {
-    font-size: 1.5rem;
+    font-size: 1.35rem;
   }
   .card {
-    padding: 28px 20px;
+    padding: 22px 18px;
   }
   .row {
     grid-template-columns: 1fr;
