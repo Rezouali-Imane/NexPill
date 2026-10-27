@@ -5,6 +5,7 @@ import type { Socket } from "socket.io";
 import { supabase } from "../config/supabase";
 import { env } from "../config/env";
 import { prisma } from "../db/prisma";
+import { verifyNexPillToken } from "../utils/token";
 
 export interface DoseRealtimePayload {
   doseId: string;
@@ -64,13 +65,32 @@ const getToken = (socket: Socket): string | undefined => {
 };
 
 const authenticateSocket = async (socket: Socket): Promise<User> => {
-  if (!supabase) {
-    throw new Error("Authentication is not configured");
-  }
-
   const token = getToken(socket);
   if (!token) {
     throw new Error("Missing bearer token");
+  }
+
+  const nexpillPayload = verifyNexPillToken(token);
+  if (nexpillPayload) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: nexpillPayload.id },
+      select: { id: true, email: true, disabledAt: true, createdAt: true },
+    });
+    if (!dbUser || dbUser.disabledAt) {
+      throw new Error("Your account is not allowed to access application data.");
+    }
+    return {
+      id: dbUser.id,
+      email: dbUser.email,
+      app_metadata: {},
+      user_metadata: { role: nexpillPayload.role || "patient" },
+      aud: "authenticated",
+      created_at: dbUser.createdAt.toISOString(),
+    } as unknown as User;
+  }
+
+  if (!supabase) {
+    throw new Error("Authentication is not configured");
   }
 
   const { data, error } = await supabase.auth.getUser(token);

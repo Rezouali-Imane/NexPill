@@ -114,19 +114,11 @@ export class CaregiverAccessService {
     const accepted = await prisma.$transaction(async (tx) => {
       await ensureUser(caregiverId, caregiverEmail);
       const claimed = await tx.caregiverAccess.updateMany({
-        data: {},
         where: {
           id: invite.id,
           status: "PENDING",
-          inviteTokenHash: tokenHash,
           inviteExpiresAt: { gt: now },
         },
-      });
-      if (claimed.count !== 1) {
-        throw new NotFoundError("Invitation not found or expired.");
-      }
-      const updated = await tx.caregiverAccess.update({
-        where: { id: invite.id },
         data: {
           caregiverId,
           status: "ACTIVE",
@@ -134,6 +126,12 @@ export class CaregiverAccessService {
           inviteTokenHash: null,
           inviteExpiresAt: null,
         },
+      });
+      if (claimed.count !== 1) {
+        throw new NotFoundError("Invitation not found or expired.");
+      }
+      const updated = await tx.caregiverAccess.findUniqueOrThrow({
+        where: { id: invite.id },
       });
       await tx.auditEvent.create({
         data: {
