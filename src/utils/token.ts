@@ -5,13 +5,19 @@ const SECRET = process.env.SUPABASE_ANON_KEY || "nexpill-auth-secret-key-2026";
 export interface TokenPayload {
   id: string;
   email: string;
+  role?: string;
   exp: number;
 }
 
-export function createNexPillToken(userId: string, email: string): string {
+export function createNexPillToken(
+  userId: string,
+  email: string,
+  role?: string,
+): string {
   const payload: TokenPayload = {
     id: userId,
     email,
+    role: role || "patient",
     exp: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
   };
   const b64Payload = Buffer.from(JSON.stringify(payload)).toString("base64url");

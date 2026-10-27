@@ -31,7 +31,7 @@ export const requireAuth: RequestHandler = async (request, response, next) => {
           id: dbUser.id,
           email: dbUser.email,
           app_metadata: {},
-          user_metadata: {},
+          user_metadata: { role: nexpillPayload.role || "patient" },
           aud: "authenticated",
           created_at: dbUser.createdAt.toISOString(),
         } as unknown as User;

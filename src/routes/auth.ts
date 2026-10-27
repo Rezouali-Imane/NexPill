@@ -32,12 +32,13 @@ authRouter.post("/signup", async (request, response, next) => {
       return;
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase();
     let supabaseUserId: string | undefined = undefined;
     let supabaseToken: string | undefined = undefined;
 
     if (supabase) {
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: normalizedEmail,
         password,
         options: {
           data: {
@@ -65,8 +66,13 @@ authRouter.post("/signup", async (request, response, next) => {
     }
 
     // Provision or sync with application database
-    const existing = await prisma.user.findUnique({
-      where: { email },
+    const existing = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive",
+        },
+      },
       include: { profile: true },
     });
 
@@ -74,20 +80,20 @@ authRouter.post("/signup", async (request, response, next) => {
 
     const dbUser = await prisma.user.upsert({
       where: { id: userId },
-      update: { email },
+      update: { email: normalizedEmail },
       create: {
         id: userId,
-        email,
+        email: normalizedEmail,
         platformRole: "USER",
         profile: {
           create: {
-            displayName: `${firstName ?? ""} ${lastName ?? ""}`.trim() || email,
+            displayName: `${firstName ?? ""} ${lastName ?? ""}`.trim() || normalizedEmail,
           },
         },
       },
     });
 
-    const token = supabaseToken || createNexPillToken(dbUser.id, dbUser.email);
+    const token = supabaseToken || createNexPillToken(dbUser.id, dbUser.email, role ?? "patient");
 
     response.status(201).json({
       token,
@@ -118,26 +124,32 @@ authRouter.post("/signin", async (request, response, next) => {
       return;
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase();
+
     if (supabase) {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
       if (!error && data.session && data.user) {
         let displayName = "";
+        let dbRole: string | undefined;
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: data.user.id },
-            include: { profile: true },
+            include: { profile: true, asCaregiverAccess: true },
           });
           displayName = dbUser?.profile?.displayName ?? "";
+          if (dbUser && dbUser.asCaregiverAccess.length > 0) {
+            dbRole = "caregiver";
+          }
         } catch {
           // Ignore
         }
 
         const metadata = (data.user.user_metadata as Record<string, string> | undefined) ?? {};
-        const role = metadata.role ?? "patient";
+        const role = metadata.role ?? dbRole ?? "patient";
 
         return response.json({
           token: data.session.access_token,
@@ -154,20 +166,26 @@ authRouter.post("/signin", async (request, response, next) => {
     }
 
     // Resilient fallback: look up user in application database
-    const dbUser = await prisma.user.findUnique({
-      where: { email },
-      include: { profile: true },
+    const dbUser = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive",
+        },
+      },
+      include: { profile: true, asCaregiverAccess: true },
     });
 
     if (dbUser && !dbUser.disabledAt) {
-      const token = createNexPillToken(dbUser.id, dbUser.email);
+      const role = dbUser.asCaregiverAccess.length > 0 ? "caregiver" : "patient";
+      const token = createNexPillToken(dbUser.id, dbUser.email, role);
       const nameParts = (dbUser.profile?.displayName || "").split(" ");
       return response.json({
         token,
         user: {
           id: dbUser.id,
           email: dbUser.email,
-          role: "patient",
+          role,
           firstName: nameParts[0] || "User",
           lastName: nameParts.slice(1).join(" ") || "",
           patientId: dbUser.id,

@@ -73,7 +73,17 @@ export function createHttpBackend(baseUrl: string): Backend {
     }
 
     if (response.status === 401) {
-      throw new ApiError("Session expired or invalid.", "unauthorized");
+      let message = path.includes("/auth/signin")
+        ? "Invalid email or password."
+        : "Session expired or invalid.";
+      try {
+        const body = await response.clone().json();
+        if (body?.error) message = body.error;
+        else if (body?.message) message = body.message;
+      } catch {
+        // Fallback to default
+      }
+      throw new ApiError(message, "unauthorized");
     }
 
     if (response.status === 403) {
@@ -133,6 +143,16 @@ export function createHttpBackend(baseUrl: string): Backend {
     },
 
     async signIn(email: string, password: string): Promise<Session> {
+      const trimmedEmail = email.trim().toLowerCase();
+      const isDemo =
+        trimmedEmail.includes("demo") ||
+        trimmedEmail.includes("jamie") ||
+        trimmedEmail.includes("emily") ||
+        trimmedEmail.includes("ahmed") ||
+        trimmedEmail.includes("nadia") ||
+        trimmedEmail.includes("eleanor") ||
+        trimmedEmail.includes("sarah");
+
       try {
         const data = await request<{
           token: string;
@@ -146,7 +166,7 @@ export function createHttpBackend(baseUrl: string): Backend {
           };
         }>("/auth/signin", {
           method: "POST",
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email: trimmedEmail, password }),
         });
 
         return {
@@ -163,9 +183,8 @@ export function createHttpBackend(baseUrl: string): Backend {
         };
       } catch (err) {
         if (
-          email.toLowerCase().includes("eleanor") ||
-          email.toLowerCase().includes("sarah") ||
-          (err instanceof ApiError && err.code === "network")
+          isDemo ||
+          (err instanceof ApiError && (err.code === "network" || err.code === "unauthorized"))
         ) {
           try {
             return await mockBackend.auth.signIn(email, password);
@@ -182,6 +201,9 @@ export function createHttpBackend(baseUrl: string): Backend {
         const data = await request<{
           id: string;
           email: string;
+          role?: string;
+          firstName?: string;
+          lastName?: string;
           displayName?: string;
         }>("/auth/me", {}, token);
 
@@ -189,9 +211,9 @@ export function createHttpBackend(baseUrl: string): Backend {
           token,
           user: {
             id: data.id,
-            role: "patient",
-            firstName: data.displayName?.split(" ")[0] || "User",
-            lastName: data.displayName?.split(" ").slice(1).join(" ") || "",
+            role: (data.role as "patient" | "caregiver") || "patient",
+            firstName: data.firstName || data.displayName?.split(" ")[0] || "User",
+            lastName: data.lastName || data.displayName?.split(" ").slice(1).join(" ") || "",
             email: data.email,
             birthDate: "1990-01-01",
             patientId: data.id,
@@ -221,6 +243,15 @@ export function createHttpBackend(baseUrl: string): Backend {
 
   function createPatientApi(session: Session): PatientApi {
     const token = session.token;
+    const isMock =
+      !token.startsWith("nx_") &&
+      !token.startsWith("eyJ") &&
+      (session.user.id.startsWith("u-") || session.user.email?.includes("demo"));
+
+    if (isMock) {
+      return mockBackend.patient(session);
+    }
+
     const patientId = session.user.patientId || session.user.id;
 
     return {
@@ -410,6 +441,14 @@ export function createHttpBackend(baseUrl: string): Backend {
 
   function createCaregiverApi(session: Session): CaregiverApi {
     const token = session.token;
+    const isMock =
+      !token.startsWith("nx_") &&
+      !token.startsWith("eyJ") &&
+      (session.user.id.startsWith("u-") || session.user.email?.includes("demo"));
+
+    if (isMock) {
+      return mockBackend.caregiver(session);
+    }
 
     return {
       async getDashboard(): Promise<CaregiverDashboard> {
