@@ -211,9 +211,11 @@ export function createHttpBackend(baseUrl: string): Backend {
         if (!role && token.startsWith("nx_")) {
           try {
             const b64 = token.slice(3).split(".")[0];
-            const payload = JSON.parse(atob(b64.replace(/-/g, "+").replace(/_/g, "/")));
-            if (payload.role === "caregiver" || payload.role === "patient") {
-              role = payload.role;
+            if (b64) {
+              const payload = JSON.parse(atob(b64.replace(/-/g, "+").replace(/_/g, "/")));
+              if (payload.role === "caregiver" || payload.role === "patient") {
+                role = payload.role;
+              }
             }
           } catch {
             // Ignore
