@@ -8,8 +8,10 @@ const { mockGetUser, mockPrisma } = vi.hoisted(() => ({
     caregiverAccess: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      delete: vi.fn(),
     },
     scheduledDose: { findMany: vi.fn() },
+    auditEvent: { create: vi.fn() },
   },
 }));
 
@@ -103,5 +105,65 @@ describe("Caregiver daily summary", () => {
 
     expect(response.status).toBe(403);
     expect(mockPrisma.scheduledDose.findMany).not.toHaveBeenCalled();
+  });
+
+  describe("DELETE /caregiver-access/:id", () => {
+    const accessId = "33333333-3333-4333-a333-333333333333";
+
+    it("allows a connected caregiver to revoke access", async () => {
+      mockPrisma.caregiverAccess.findUnique.mockResolvedValue({
+        id: accessId,
+        patientId,
+        caregiverId,
+        status: "ACTIVE",
+      });
+      mockPrisma.caregiverAccess.delete.mockResolvedValue({});
+      mockPrisma.auditEvent.create.mockResolvedValue({});
+
+      const response = await request(app)
+        .delete(`/caregiver-access/${accessId}`)
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ success: true });
+      expect(mockPrisma.caregiverAccess.delete).toHaveBeenCalledWith({
+        where: { id: accessId },
+      });
+      expect(mockPrisma.auditEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: "CAREGIVER_ACCESS_REVOKED",
+            resourceId: accessId,
+          }),
+        })
+      );
+    });
+
+    it("rejects revocation if user is neither caregiver nor patient with 403", async () => {
+      mockPrisma.caregiverAccess.findUnique.mockResolvedValue({
+        id: accessId,
+        patientId: "some-other-patient",
+        caregiverId: "some-other-caregiver",
+        status: "ACTIVE",
+      });
+
+      const response = await request(app)
+        .delete(`/caregiver-access/${accessId}`)
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(403);
+      expect(mockPrisma.caregiverAccess.delete).not.toHaveBeenCalled();
+    });
+
+    it("returns 404 if access record does not exist", async () => {
+      mockPrisma.caregiverAccess.findUnique.mockResolvedValue(null);
+
+      const response = await request(app)
+        .delete(`/caregiver-access/${accessId}`)
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(404);
+      expect(mockPrisma.caregiverAccess.delete).not.toHaveBeenCalled();
+    });
   });
 });

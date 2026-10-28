@@ -46,6 +46,19 @@ caregiverAccessRouter.get("/", async (request, response, next) => {
   }
 });
 
+caregiverAccessRouter.delete("/:id", async (request, response, next) => {
+  try {
+    const accessId = getParamString(request.params.id);
+    const result = await CaregiverAccessService.revokeAccess(
+      request.user!.id,
+      accessId,
+    );
+    response.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 caregiverAccessRouter.get("/:patientId/daily-summary", async (request, response, next) => {
   try {
     const date = validateNonEmptyString(request.query.date, "date");

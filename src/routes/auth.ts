@@ -11,10 +11,64 @@ export const authRouter = Router();
  * GET /auth/me
  * Retrieves current authenticated user profile.
  */
-authRouter.get("/me", requireAuth, (request, response) => {
+authRouter.get("/me", requireAuth, async (request, response) => {
+  const user = request.user;
+  let role = (user?.user_metadata as Record<string, any> | undefined)?.role;
+
+  if (!role && user?.id) {
+    try {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        include: { profile: true, asCaregiverAccess: true },
+      });
+      if (dbUser && dbUser.asCaregiverAccess.length > 0) {
+        role = "caregiver";
+      }
+      if (!role) {
+        const authRecord: any = await prisma.$queryRaw`
+          SELECT raw_user_meta_data->>'role' as role
+          FROM auth.users
+          WHERE id = ${user.id}::uuid
+          LIMIT 1
+        `;
+        if (authRecord?.[0]?.role) {
+          role = authRecord[0].role;
+        }
+      }
+    } catch {
+      // Fall through
+    }
+  }
+
+  let displayName = "";
+  if (user?.id) {
+    try {
+      const profile = await prisma.userProfile.findUnique({
+        where: { userId: user.id },
+      });
+      displayName = profile?.displayName ?? "";
+    } catch {
+      // Ignore
+    }
+  }
+
+  const nameParts = displayName.split(" ");
+  const firstName =
+    (user?.user_metadata as Record<string, any> | undefined)?.firstName ||
+    nameParts[0] ||
+    "";
+  const lastName =
+    (user?.user_metadata as Record<string, any> | undefined)?.lastName ||
+    nameParts.slice(1).join(" ") ||
+    "";
+
   response.json({
-    id: request.user?.id,
-    email: request.user?.email,
+    id: user?.id,
+    email: user?.email,
+    ...(role ? { role } : {}),
+    ...(firstName ? { firstName } : {}),
+    ...(lastName ? { lastName } : {}),
+    ...(displayName ? { displayName } : {}),
   });
 });
 
@@ -177,7 +231,26 @@ authRouter.post("/signin", async (request, response, next) => {
     });
 
     if (dbUser && !dbUser.disabledAt) {
-      const role = dbUser.asCaregiverAccess.length > 0 ? "caregiver" : "patient";
+      let resolvedRole: string = request.body?.role || "";
+      if (!resolvedRole) {
+        try {
+          const authRecord: any = await prisma.$queryRaw`
+            SELECT raw_user_meta_data->>'role' as role
+            FROM auth.users
+            WHERE id = ${dbUser.id}::uuid
+            LIMIT 1
+          `;
+          if (authRecord?.[0]?.role) {
+            resolvedRole = authRecord[0].role;
+          }
+        } catch {
+          // Fall through
+        }
+      }
+      if (!resolvedRole) {
+        resolvedRole = dbUser.asCaregiverAccess.length > 0 ? "caregiver" : "patient";
+      }
+      const role = resolvedRole;
       const token = createNexPillToken(dbUser.id, dbUser.email, role);
       const nameParts = (dbUser.profile?.displayName || "").split(" ");
       return response.json({

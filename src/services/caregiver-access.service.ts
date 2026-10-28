@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { prisma } from "../db/prisma";
-import { BadRequestError, NotFoundError } from "../errors";
+import { BadRequestError, ForbiddenError, NotFoundError } from "../errors";
 import { AccessControlService } from "./access-control.service";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -35,21 +35,39 @@ export class CaregiverAccessService {
     const token = "NX-" + Array.from(bytes).map((b) => alphabet[b % alphabet.length]).join("");
     const inviteExpiresAt = new Date(Date.now() + INVITE_TTL_MS);
     const access = await prisma.$transaction(async (tx) => {
-      const created = await tx.caregiverAccess.create({
-        data: {
-          patientId,
-          requestedById: patientId,
-          status: "PENDING",
-          inviteTokenHash: hashToken(token),
-          inviteExpiresAt,
-          canViewSchedule: permissions.canViewSchedule ?? true,
-          canViewHistory: permissions.canViewHistory ?? true,
-          canReceiveAlerts: permissions.canReceiveAlerts ?? true,
-          canRecordDoses: permissions.canRecordDoses ?? false,
-          canManageMedications: permissions.canManageMedications ?? false,
-        },
-        select: { id: true, inviteExpiresAt: true },
-      });
+      let created: { id: string; inviteExpiresAt: Date | null };
+      try {
+        created = await (tx.caregiverAccess as any).create({
+          data: {
+            patientId,
+            requestedById: patientId,
+            status: "PENDING",
+            inviteTokenHash: hashToken(token),
+            inviteExpiresAt,
+            canViewSchedule: permissions.canViewSchedule ?? true,
+            canViewHistory: permissions.canViewHistory ?? true,
+            canReceiveAlerts: permissions.canReceiveAlerts ?? true,
+            canRecordDoses: permissions.canRecordDoses ?? false,
+            canManageMedications: permissions.canManageMedications ?? false,
+          },
+          select: { id: true, inviteExpiresAt: true },
+        });
+      } catch {
+        const rows = await tx.$queryRaw<Array<{ id: string; inviteExpiresAt: Date }>>`
+          INSERT INTO "CaregiverAccess" (
+            "id", "patientId", "requestedById", "status", "inviteTokenHash", 
+            "inviteExpiresAt", "canViewSchedule", "canViewHistory", "canReceiveAlerts", 
+            "canRecordDoses", "canManageMedications", "createdAt", "updatedAt"
+          ) VALUES (
+            gen_random_uuid(), ${patientId}::uuid, ${patientId}::uuid, 'PENDING'::"AccessStatus", 
+            ${hashToken(token)}, ${inviteExpiresAt}, ${permissions.canViewSchedule ?? true}, 
+            ${permissions.canViewHistory ?? true}, ${permissions.canReceiveAlerts ?? true}, 
+            ${permissions.canRecordDoses ?? false}, ${permissions.canManageMedications ?? false}, 
+            NOW(), NOW()
+          ) RETURNING "id", "inviteExpiresAt"
+        `;
+        created = rows[0];
+      }
 
       await tx.auditEvent.create({
         data: {
@@ -154,6 +172,7 @@ export class CaregiverAccessService {
     return prisma.caregiverAccess.findMany({
       where: {
         OR: [{ patientId: userId }, { caregiverId: userId }],
+        status: "ACTIVE",
       },
       select: {
         id: true,
@@ -167,7 +186,65 @@ export class CaregiverAccessService {
         canManageMedications: true,
         grantedAt: true,
         createdAt: true,
+        patient: {
+          select: {
+            id: true,
+            email: true,
+            profile: {
+              select: {
+                displayName: true,
+              },
+            },
+          },
+        },
+        caregiver: {
+          select: {
+            id: true,
+            email: true,
+            profile: {
+              select: {
+                displayName: true,
+              },
+            },
+          },
+        },
       },
     });
+  }
+
+  static async revokeAccess(actorUserId: string, accessId: string) {
+    const access = await prisma.caregiverAccess.findUnique({
+      where: { id: accessId },
+    });
+
+    if (!access) {
+      throw new NotFoundError("Caregiver access record not found.");
+    }
+
+    if (access.patientId !== actorUserId && access.caregiverId !== actorUserId) {
+      throw new ForbiddenError("Not authorized to revoke this caregiver access.");
+    }
+
+    await prisma.caregiverAccess.delete({
+      where: { id: accessId },
+    });
+
+    await prisma.auditEvent.create({
+      data: {
+        actorType: "USER",
+        actorId: actorUserId,
+        patientId: access.patientId,
+        action: "CAREGIVER_ACCESS_REVOKED",
+        resourceType: "CaregiverAccess",
+        resourceId: access.id,
+        metadata: {
+          revokedBy: actorUserId,
+          caregiverId: access.caregiverId,
+          patientId: access.patientId,
+        },
+      },
+    });
+
+    return { success: true };
   }
 }

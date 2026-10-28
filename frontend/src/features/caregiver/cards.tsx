@@ -16,7 +16,13 @@ import { backendUrl } from '@/api';
 import s from './Caregiver.module.css';
 
 const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-export const initials = (v: PatientView) => `${v.patient.firstName[0]}${v.patient.lastName[0]}`.toUpperCase();
+export const initials = (v: PatientView) => {
+  const f = v.patient.firstName?.trim()?.[0] || '';
+  const l = v.patient.lastName?.trim()?.[0] || '';
+  if (f && l) return `${f}${l}`.toUpperCase();
+  if (f) return f.toUpperCase();
+  return 'P';
+};
 const riskTone = (r: RiskLevel) => (r === 'high' ? 'concern' : r === 'attention' ? 'warning' : 'success') as 'concern' | 'warning' | 'success';
 
 export function RiskTag({ level }: { level: RiskLevel }) {
@@ -240,7 +246,9 @@ export function InsightsCard({ view, today, now }: { view: PatientView; today: s
     setIsQuerying(true);
     try {
       const token =
+        sessionStorage.getItem('nexpill.token') ||
         sessionStorage.getItem('nexpill_token') ||
+        localStorage.getItem('nexpill.token') ||
         localStorage.getItem('nexpill_token') ||
         '';
 

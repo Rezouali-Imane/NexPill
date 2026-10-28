@@ -4,6 +4,7 @@ import { createMedicalMcpServer } from "../mcp/medical-server";
 import { AccessControlService } from "./access-control.service";
 import { validateUuid } from "../utils/validation";
 import { emitAgentInsight } from "../realtime/dose-events";
+import { AiSummaryService } from "./ai-summary.service";
 
 export interface AgentQueryResult {
   response: string;
@@ -206,6 +207,29 @@ export class ClinicalAgentService {
           `His overall confirmation rate is 80% (28/35 doses confirmed). Morning adherence is high (95%), but evening doses carry substantial friction (40% confirmation rate).`;
       }
 
+      if (process.env.NODE_ENV !== "test") {
+        const ai = await AiSummaryService.getClient();
+        if (ai) {
+          try {
+            const prompt = `User query about benchmark patient Ahmed: "${query}"\nPatient Profile:\n${JSON.stringify(demoData, null, 2)}\n\nInstructions: Answer the caregiver's question accurately, concisely, and helpfully based on Ahmed's profile. Do not recommend changing prescriptions or dosages.`;
+            const gen = await ai.models.generateContent({
+              model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+              contents: prompt,
+              config: {
+                systemInstruction: "You are NexPill's clinical adherence assistant. Ground all statements strictly in the patient data. Never modify prescriptions or dosages.",
+                temperature: 0.2,
+              },
+            });
+            const text = gen.text?.trim();
+            if (text) {
+              answer = text;
+            }
+          } catch {
+            // keep standard answer
+          }
+        }
+      }
+
       const demoResult: AgentQueryResult = {
         response: answer,
         safeguardTriggered: false,
@@ -268,6 +292,32 @@ export class ClinicalAgentService {
           `Risk Level: ${parsed.riskAssessment.level} (Score: ${parsed.riskAssessment.score})\n\n` +
           `Key Findings:\n${reasonsList}\n\n` +
           `Note: Unconfirmed doses reflect absence of confirmation telemetry rather than verified non-adherence.`;
+
+        if (process.env.NODE_ENV !== "test") {
+          const ai = await AiSummaryService.getClient();
+          if (ai) {
+            try {
+              const prompt = `User query: "${query}"\nPatient Adherence Data:\n${JSON.stringify(parsed, null, 2)}\n\nInstructions:\n1. Answer the user query clearly and accurately grounded in the provided patient data.\n2. Always state the patient adherence rate (${ratePct}%) and risk level (${parsed.riskAssessment.level}).\n3. Do not recommend changing prescriptions or dosages.`;
+              const gen = await ai.models.generateContent({
+                model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+                contents: prompt,
+                config: {
+                  systemInstruction: "You are NexPill's clinical adherence assistant. Ground all statements in verified patient telemetry. Never change prescriptions or dosages.",
+                  temperature: 0.2,
+                },
+              });
+              const text = gen.text?.trim();
+              if (text) {
+                responseText = text;
+                if (!responseText.toLowerCase().includes("patient adherence rate")) {
+                  responseText = `Patient adherence rate is at ${ratePct}% (${parsed.metrics.confirmedCount}/${parsed.metrics.totalScheduled} doses confirmed).\n\n` + responseText;
+                }
+              }
+            } catch {
+              // fallback to deterministic responseText
+            }
+          }
+        }
       } else if (lower.includes("history") || lower.includes("doses") || lower.includes("events")) {
         // Query adherence dose history
         toolsInvoked.push("get_patient_adherence_history");

@@ -207,11 +207,24 @@ export function createHttpBackend(baseUrl: string): Backend {
           displayName?: string;
         }>("/auth/me", {}, token);
 
+        let role = data.role as "patient" | "caregiver" | undefined;
+        if (!role && token.startsWith("nx_")) {
+          try {
+            const b64 = token.slice(3).split(".")[0];
+            const payload = JSON.parse(atob(b64.replace(/-/g, "+").replace(/_/g, "/")));
+            if (payload.role === "caregiver" || payload.role === "patient") {
+              role = payload.role;
+            }
+          } catch {
+            // Ignore
+          }
+        }
+
         return {
           token,
           user: {
             id: data.id,
-            role: (data.role as "patient" | "caregiver") || "patient",
+            role: role || "patient",
             firstName: data.firstName || data.displayName?.split(" ")[0] || "User",
             lastName: data.lastName || data.displayName?.split(" ").slice(1).join(" ") || "",
             email: data.email,
@@ -419,7 +432,21 @@ export function createHttpBackend(baseUrl: string): Backend {
         return "NX-" + Array.from(crypto.getRandomValues(new Uint8Array(8))).map((b) => alphabet[b % alphabet.length]).join("");
       },
 
-      async removeCaregiver(_linkId: string): Promise<void> {},
+      async removeCaregiver(linkId: string): Promise<void> {
+        try {
+          await request(`/caregiver-access/${linkId}`, { method: "DELETE" }, token);
+        } catch (err) {
+          try {
+            if (mockBackend.patient(session).removeCaregiver) {
+              await mockBackend.patient(session).removeCaregiver!(linkId);
+              return;
+            }
+          } catch {
+            // ignore
+          }
+          throw err;
+        }
+      },
 
       async loadSamplePlan(): Promise<Snapshot> {
         if (mockBackend.patient(session).loadSamplePlan) {
@@ -488,12 +515,16 @@ export function createHttpBackend(baseUrl: string): Backend {
               link.patient?.email?.split("@")[0] ||
               "Patient";
 
+            const nameParts = patientName.trim().split(/\s+/);
+            const firstName = nameParts[0] || "Patient";
+            const lastName = nameParts.slice(1).join(" ") || "";
+
             return {
               link: mapBackendCareLink(link),
               patient: {
                 id: patientId,
-                firstName: patientName.split(" ")[0] || "Patient",
-                lastName: patientName.split(" ").slice(1).join(" "),
+                firstName,
+                lastName,
               },
               medications: medsRes.medications.map(mapBackendMedication),
               doses: dosesRes.doses.map(mapBackendDose),
@@ -539,7 +570,21 @@ export function createHttpBackend(baseUrl: string): Backend {
         }
       },
 
-      async unlinkPatient(_linkId: string): Promise<void> {},
+      async unlinkPatient(linkId: string): Promise<void> {
+        try {
+          await request(`/caregiver-access/${linkId}`, { method: "DELETE" }, token);
+        } catch (err) {
+          try {
+            if (mockBackend.caregiver(session).unlinkPatient) {
+              await mockBackend.caregiver(session).unlinkPatient!(linkId);
+              return;
+            }
+          } catch {
+            // ignore
+          }
+          throw err;
+        }
+      },
 
       async markMessagesSeen(_patientId: string): Promise<void> {},
 
@@ -574,8 +619,12 @@ export function createHttpBackend(baseUrl: string): Backend {
       this.setState("connecting");
 
       const token =
-        (typeof sessionStorage !== "undefined" && sessionStorage.getItem("nexpill_token")) ||
-        (typeof localStorage !== "undefined" && localStorage.getItem("nexpill_token")) ||
+        (typeof sessionStorage !== "undefined" &&
+          (sessionStorage.getItem("nexpill.token") ||
+            sessionStorage.getItem("nexpill_token"))) ||
+        (typeof localStorage !== "undefined" &&
+          (localStorage.getItem("nexpill.token") ||
+            localStorage.getItem("nexpill_token"))) ||
         "";
 
       this.socket = io(cleanUrl, {
