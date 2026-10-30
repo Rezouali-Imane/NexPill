@@ -82,25 +82,25 @@ Medication non-adherence is one of the leading drivers of preventable hospital r
 ### 1. Authentication & Judge Access Card
 The authentication portal features a dedicated quick-access card on the brand sidebar with pre-configured judge credentials and 1-click auto-fill:
 <p align="center">
-  <img src="docs/assets/auth-screen.png" alt="NexPill Authentication & Demo Access" width="850" />
+  <img src="docs/assets/auth-screen-live.png" alt="NexPill Authentication & Demo Access" width="850" />
 </p>
 
 ### 2. Patient Daily Overview & Adherence Dashboard
 A distraction-free, accessible schedule showing daily progress, upcoming doses, days of supply, and primary caregiver connection:
 <p align="center">
-  <img src="docs/assets/patient-dashboard.png" alt="Patient Dashboard" width="850" />
+  <img src="docs/assets/patient-dashboard-live.png" alt="Patient Dashboard" width="850" />
 </p>
 
 ### 3. Caregiver Monitoring & Risk Dashboard
 Real-time dashboard allowing caregivers to monitor adherence risk levels, recent alerts, and medication schedules across connected patients:
 <p align="center">
-  <img src="docs/assets/caregiver-dashboard.png" alt="Caregiver Dashboard" width="850" />
+  <img src="docs/assets/caregiver-dashboard-live.png" alt="Caregiver Dashboard" width="850" />
 </p>
 
 ### 4. Medication Management & Add Medication Regimen
 Comprehensive prescription library with detailed dosage instructions, daily time chips, supply counts, and the interactive Add Medication builder:
 <p align="center">
-  <img src="docs/assets/medications-management.png" alt="Medications Management" width="850" />
+  <img src="docs/assets/medications-management-live.png" alt="Medications Management" width="850" />
 </p>
 
 ---
@@ -171,13 +171,6 @@ sequenceDiagram
 ---
 
 ## 💻 Tech Stack
-
-### Comma-Separated Summary:
-```text
-React 19, TypeScript, Vite, React Router 7, Node.js, Express 5, Prisma ORM, PostgreSQL, Supabase, Google Gemini API, Model Context Protocol (MCP), Python, scikit-learn, Pandas, NumPy, Joblib, Socket.IO, Zod, Swagger/OpenAPI, Vitest, Testing Library, Supertest, CSS Modules, Render, Railway
-```
-
-### Detailed Breakdown:
 
 | Layer | Technologies |
 | :--- | :--- |
