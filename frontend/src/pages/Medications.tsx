@@ -9,9 +9,10 @@ import { StatusTag } from '@/components/ui/StatusTag';
 import p from '@/components/ui/Page.module.css';
 import { daysOfSupply } from '@/domain/derive';
 import type { Medication } from '@/domain/types';
+import { AddMedicationDialog } from '@/features/dialogs/AddMedicationDialog';
 import { RefillDialog } from '@/features/dialogs/ContactDialogs';
 import { formatClock } from '@/lib/time';
-import { usePatientData } from '@/state/PatientStore';
+import { usePatientActions, usePatientData } from '@/state/PatientStore';
 
 function MedCard({ med }: { med: Medication }) {
   const data = usePatientData();
@@ -46,16 +47,46 @@ function MedCard({ med }: { med: Medication }) {
 
 export default function Medications() {
   const data = usePatientData();
+  const { loadSamplePlan } = usePatientActions();
+  const [addOpen, setAddOpen] = useState(false);
   const { hash } = useLocation();
+
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
   }, [hash]);
+
   return (
     <>
-      <PageHeader title="Medications" subtitle="Everything you take, and how to take it" />
-      <div className={p.stack}>
-        {data.medications.map((m) => <MedCard key={m.id} med={m} />)}
-      </div>
+      <PageHeader
+        title="Medications"
+        subtitle="Everything you take, and how to take it"
+        actions={
+          <Button size="md" variant="primary" onClick={() => setAddOpen(true)}>
+            <Icon name="plus" size={16} /> Add medication
+          </Button>
+        }
+      />
+      {data.medications.length === 0 ? (
+        <Card as="section" aria-labelledby="no-meds-heading">
+          <h2 id="no-meds-heading" className={p.h2} style={{ marginBottom: 6 }}>No medications on your plan yet</h2>
+          <p className={p.sub} style={{ marginBottom: 20 }}>
+            Add your daily medications to start tracking doses, reminders, and refills, or load our demo schedule to explore NexPill.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <Button size="md" variant="primary" onClick={() => setAddOpen(true)}>
+              <Icon name="plus" size={16} /> Add medication
+            </Button>
+            <Button size="md" variant="secondary" onClick={() => void loadSamplePlan()}>
+              Load a sample plan (demo)
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <div className={p.stack}>
+          {data.medications.map((m) => <MedCard key={m.id} med={m} />)}
+        </div>
+      )}
+      <AddMedicationDialog open={addOpen} onClose={() => setAddOpen(false)} />
     </>
   );
 }

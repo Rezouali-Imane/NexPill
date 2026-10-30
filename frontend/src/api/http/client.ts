@@ -2,6 +2,7 @@ import { mockBackend } from "../mock";
 import { io, type Socket } from "socket.io-client";
 import {
   ApiError,
+  type AddMedicationInput,
   type AuthApi,
   type Backend,
   type CaregiverApi,
@@ -17,6 +18,7 @@ import type {
   ConnectionState,
   Dose,
   DoseOutcome,
+  Medication,
   RefillRequest,
   ServerEvent,
   Settings,
@@ -448,6 +450,78 @@ export function createHttpBackend(baseUrl: string): Backend {
           }
           throw err;
         }
+      },
+
+      async addMedication(input: AddMedicationInput): Promise<Medication> {
+        if (isMock) {
+          if (mockBackend.patient(session).addMedication) {
+            return mockBackend.patient(session).addMedication!(input);
+          }
+        }
+
+        const medRes = await request<{ medication: BackendMedication }>(
+          "/medications",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              patientId,
+              name: input.name,
+              dosageText: input.strength || "Standard dose",
+              form: input.form || "tablet",
+              instructions: input.instructions || "Take as prescribed",
+              prescriber: input.prescriber || "Primary Care Physician",
+              startDate: new Date().toISOString(),
+            }),
+          },
+          token,
+        );
+
+        const newMedId = medRes.medication.id;
+        const times = input.scheduleTimes && input.scheduleTimes.length > 0 ? input.scheduleTimes : ["08:00"];
+
+        const schedRes = await request<{ schedule: { id: string } }>(
+          `/medications/${newMedId}/schedules`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              doseLabel: input.strength || "1 dose",
+              timesOfDay: times,
+              daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+              startDate: new Date().toISOString(),
+            }),
+          },
+          token,
+        );
+
+        try {
+          const start = new Date();
+          const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+          await request(
+            "/doses/generate",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                scheduleId: schedRes.schedule.id,
+                startDate: start.toISOString(),
+                endDate: end.toISOString(),
+              }),
+            },
+            token,
+          );
+        } catch {
+          // Non-fatal
+        }
+
+        return mapBackendMedication({
+          ...medRes.medication,
+          schedules: [
+            {
+              id: schedRes.schedule.id,
+              doseLabel: input.strength || "1 dose",
+              timesOfDay: times,
+            },
+          ],
+        });
       },
 
       async loadSamplePlan(): Promise<Snapshot> {

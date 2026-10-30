@@ -11,6 +11,7 @@ import {
 import {
   backend,
   ApiError,
+  type AddMedicationInput,
   type PatientApi,
   type RealtimeChannel,
 } from "@/api";
@@ -129,6 +130,7 @@ export interface PatientActions {
   getShareId(): Promise<string | null>;
   regenerateShareId(): Promise<string | null>;
   removeCaregiver(linkId: string): Promise<void>;
+  addMedication(input: AddMedicationInput): Promise<boolean>;
   loadSamplePlan(): Promise<void>;
   resetDemo(): Promise<void>;
   reload(): Promise<void>;
@@ -340,6 +342,20 @@ export function PatientProvider({
           await reload();
         } catch (e) {
           console.warn(errText(e));
+        }
+      },
+      async addMedication(input) {
+        try {
+          if (api.addMedication) {
+            await api.addMedication(input);
+            toast("success", `${input.name} added to your plan.`);
+            await reload();
+            return true;
+          }
+          return false;
+        } catch (e) {
+          toast("error", errText(e) || "Could not add medication.");
+          return false;
         }
       },
       async loadSamplePlan() {

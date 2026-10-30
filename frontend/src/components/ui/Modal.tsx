@@ -18,6 +18,8 @@ export function Modal({ open, title, description, onClose, children }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descId = useId();
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -29,7 +31,7 @@ export function Modal({ open, title, description, onClose, children }: Props) {
     first?.focus();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+      if (e.key === 'Escape') { e.stopPropagation(); onCloseRef.current(); return; }
       if (e.key !== 'Tab' || !el) return;
       const nodes = [...el.querySelectorAll<HTMLElement>(FOCUSABLE)];
       if (nodes.length === 0) return;
@@ -43,7 +45,7 @@ export function Modal({ open, title, description, onClose, children }: Props) {
       document.body.style.overflow = prevOverflow;
       previous?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   return createPortal(

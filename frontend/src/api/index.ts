@@ -27,6 +27,7 @@ export { mockBackend };
 export { mockRealtime } from "./mockRealtime";
 export { ApiError } from "./client";
 export type {
+  AddMedicationInput,
   AuthApi,
   Backend,
   CaregiverApi,

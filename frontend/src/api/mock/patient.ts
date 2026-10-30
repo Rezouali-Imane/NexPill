@@ -1,4 +1,4 @@
-import { ApiError, type PatientApi } from "../client";
+import { ApiError, type PatientApi, type AddMedicationInput } from "../client";
 import type { CareLink, Session } from "@/domain/auth";
 import type {
   AppNotification,
@@ -6,6 +6,7 @@ import type {
   CaregiverMessage,
   CareTeamMessage,
   DoseOutcome,
+  Medication,
   RefillRequest,
   Snapshot,
 } from "@/domain/types";
@@ -303,6 +304,39 @@ export function createMockPatientApi(session: Session): PatientApi {
         link: clone(link),
         removed: true,
       });
+    },
+
+    async addMedication(input: AddMedicationInput) {
+      await wait(200);
+      const { db, rec } = await ctx();
+      const medId = `m-${Date.now()}`;
+      const newMed: Medication = {
+        id: medId,
+        name: input.name,
+        strength: input.strength || "Standard dose",
+        form: input.form || "tablet",
+        instructions: input.instructions || "Take as prescribed",
+        important: input.important || "Take regularly at scheduled times.",
+        prescriber: input.prescriber || "Primary Care Physician",
+        purpose: input.purpose || "Prescribed therapy",
+        schedule: input.scheduleTimes.length > 0 ? input.scheduleTimes : ["08:00"],
+        pillsLeft: 30,
+        refillThresholdDays: 7,
+      };
+      rec.medications.push(newMed);
+      const todayStr = toISODate(new Date());
+      for (const time of newMed.schedule) {
+        rec.doses.push({
+          id: `d-${medId}-${todayStr}-${time.replace(":", "")}`,
+          medicationId: medId,
+          date: todayStr,
+          time,
+          status: "upcoming",
+          source: "app",
+        });
+      }
+      save(db);
+      return newMed;
     },
 
     async loadSamplePlan() {

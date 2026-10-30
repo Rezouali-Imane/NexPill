@@ -11,6 +11,7 @@ import type {
   ConnectionState,
   Dose,
   DoseOutcome,
+  Medication,
   RefillRequest,
   ServerEvent,
   Settings,
@@ -49,6 +50,17 @@ export interface AuthApi {
   resetPassword(resetToken: string, newPassword: string): Promise<void>;
 }
 
+export interface AddMedicationInput {
+  name: string;
+  strength?: string;
+  form?: string;
+  scheduleTimes: string[];
+  instructions?: string;
+  prescriber?: string;
+  important?: string;
+  purpose?: string;
+}
+
 export interface PatientApi {
   getSnapshot(): Promise<Snapshot>;
   recordDose(doseId: string, outcome: DoseOutcome): Promise<Dose>;
@@ -62,6 +74,8 @@ export interface PatientApi {
   /** Replaces the ID; the old one stops working, existing caregivers stay linked. */
   regenerateShareId(): Promise<string>;
   removeCaregiver(linkId: string): Promise<void>;
+  /** Add a new prescribed medication and generate its schedule */
+  addMedication?(input: AddMedicationInput): Promise<Medication>;
   /** Mock only: fill an empty account with a sample plan. */
   loadSamplePlan?(): Promise<Snapshot>;
   /** Mock only: restore seed data. */
