@@ -35,7 +35,7 @@ describe('medications & add medication flow', () => {
 
     // Click "+ Add medication" button in page header
     const addButtons = screen.getAllByRole('button', { name: /add medication/i });
-    await userEvent.click(addButtons[0]);
+    await userEvent.click(addButtons[0]!);
 
     // Modal should be visible
     expect(await screen.findByRole('dialog')).toBeInTheDocument();

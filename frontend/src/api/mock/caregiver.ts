@@ -13,7 +13,13 @@ export function createMockCaregiverApi(session: Session): CaregiverApi {
     throw new ApiError("Caregivers only.", "forbidden");
   const me = session.user.id;
 
-  const mine = (db: DB) => db.links.filter((l) => l.caregiverId === me);
+  const mine = (db: DB) =>
+    db.links.filter(
+      (l) =>
+        l.caregiverId === me ||
+        (me === "u-caregiver" && l.caregiverId === "u-emily") ||
+        (me === "u-emily" && l.caregiverId === "u-caregiver"),
+    );
 
   const view = (db: DB, link: CareLink): PatientView | null => {
     const rec = db.patients[link.patientId];

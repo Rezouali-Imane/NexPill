@@ -15,7 +15,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
-  overflow: hidden;
+  overflow-y: auto;
   position: relative;
 }
 
@@ -267,4 +267,109 @@
   .row {
     grid-template-columns: 1fr;
   }
+}
+
+
+/* Demo Credentials Widget in Brand Sidebar */
+.demoCard {
+  width: 100%;
+  margin-top: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #fff;
+  text-align: left;
+}
+
+.demoHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.demoBadge {
+  display: inline-block;
+  background: rgba(45, 140, 126, 0.45);
+  color: #a7f3d0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(167, 243, 208, 0.35);
+}
+
+.demoIntro {
+  font-size: 0.8125rem;
+  color: var(--nx-nav-text);
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.demoAccount {
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 9px 12px;
+  margin-bottom: 8px;
+}
+
+.demoAccount:last-child {
+  margin-bottom: 0;
+}
+
+.demoRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.demoRole {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.demoFillBtn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--nx-primary);
+  padding: 3px 9px;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.demoFillBtn:hover {
+  opacity: 0.9;
+}
+
+.demoField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.88);
+  margin-top: 3px;
+}
+
+.demoLabel {
+  font-size: 0.75rem;
+  color: var(--nx-nav-text);
+  min-width: 62px;
+}
+
+.demoCode {
+  font-family: monospace;
+  font-size: 0.8125rem;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #f1f5f9;
+  user-select: all;
 }

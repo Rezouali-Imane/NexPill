@@ -58,8 +58,10 @@ export interface DB {
 
 export const DEMO_PASSWORD = "Nexpill123!";
 export const DEMO_ACCOUNTS = {
-  patient: "jamie@nexpill.demo",
-  caregiver: "emily@nexpill.demo",
+  patient: "patient@nexpill.demo",
+  caregiver: "caregiver@nexpill.demo",
+  jamie: "jamie@nexpill.demo",
+  emily: "emily@nexpill.demo",
 };
 
 const KEY = "nexpill.mock.db.v3";

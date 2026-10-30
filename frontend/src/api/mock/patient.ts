@@ -46,7 +46,17 @@ export function createMockPatientApi(session: Session): PatientApi {
     if (!rec) throw new ApiError("Patient not found", "not-found");
     return { db, rec };
   };
-  const links = (db: DB) => db.links.filter((l) => l.patientId === patientId);
+  const links = (db: DB) => {
+    const raw = db.links.filter((l) => l.patientId === patientId);
+    const seen = new Set<string>();
+    return raw.filter((l) => {
+      const n = userName(db, l.caregiverId);
+      const key = (n?.full || l.caregiverId).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
 
   const toCaregiver = (db: DB, l: CareLink): Caregiver => {
     const n = userName(db, l.caregiverId);

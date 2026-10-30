@@ -298,9 +298,16 @@ export function createHttpBackend(baseUrl: string): Backend {
 
         const medications = medsRes.medications.map(mapBackendMedication);
         const doses = dosesRes.doses.map(mapBackendDose);
+        const seenCaregivers = new Set<string>();
         const caregivers = accessRes.access
           .filter((a) => a.status === "ACTIVE")
-          .map(mapBackendCaregiver);
+          .map(mapBackendCaregiver)
+          .filter((c) => {
+            const key = (c.name || c.userId || c.id).toLowerCase();
+            if (seenCaregivers.has(key)) return false;
+            seenCaregivers.add(key);
+            return true;
+          });
         const notifications = notifsRes.notifications.map(mapBackendNotification);
 
         return {
