@@ -110,42 +110,42 @@ Comprehensive prescription library with detailed dosage instructions, daily time
 ```mermaid
 flowchart TD
     subgraph Client["Frontend Layer (React 19 + Vite)"]
-        UI_P[Patient Portal]
-        UI_C[Caregiver Portal]
-        WS_C[Socket.IO Client]
-        MOCK[Offline / Demo Fallback Store]
+        UI_P["Patient Portal"]
+        UI_C["Caregiver Portal"]
+        WS_C["Socket.IO Client"]
+        MOCK["Offline / Demo Fallback Store"]
     end
 
     subgraph API["Backend Services (Node.js + Express 5)"]
-        AUTH[Auth Service / RBAC]
-        DOSE[Dose Engine & Event Ledger]
-        SCHED[Schedule & Conflict Engine]
-        JOBS[Missed-Dose Cron Job]
-        WS_S[Socket.IO Server]
+        AUTH["Auth Service & RBAC"]
+        DOSE["Dose Engine & Event Ledger"]
+        SCHED["Schedule & Conflict Engine"]
+        JOBS["Missed-Dose Cron Job"]
+        WS_S["Socket.IO Server"]
     end
 
     subgraph Intelligence["AI & ML Services"]
-        MCP[Medical MCP Server (POST /mcp)]
-        GEMINI[Gemini 2.0 Flash Clinical Agent]
-        SAFEGUARDS[Safety Guardrails Engine]
-        ML[Python ML Risk Predictor (scikit-learn)]
+        MCP["Medical MCP Server (POST /mcp)"]
+        GEMINI["Gemini 2.0 Flash Clinical Agent"]
+        SAFEGUARDS["Safety Guardrails Engine"]
+        ML["Python ML Risk Predictor (scikit-learn)"]
     end
 
     subgraph Data["Persistence & External Services"]
-        DB[(PostgreSQL / Supabase)]
-        RXNORM[NIH RxNorm Terminology API]
+        DB[("PostgreSQL Database (Supabase)")]
+        RXNORM["NIH RxNorm Terminology API"]
     end
 
-    UI_P -->|HTTPS / REST| API
-    UI_C -->|HTTPS / REST| API
-    WS_C <-->|WebSockets (Real-time updates)| WS_S
-    API -->|Prisma ORM| DB
-    API -->|POST /agent/query| GEMINI
-    GEMINI -->|Tools Protocol| MCP
+    UI_P --> API
+    UI_C --> API
+    WS_C <--> WS_S
+    API --> DB
+    API --> GEMINI
+    GEMINI --> MCP
     MCP --> SAFEGUARDS
     MCP --> RXNORM
     DOSE --> JOBS
-    ML -.->|Inference| DOSE
+    ML -.-> DOSE
 ```
 
 ### Real-Time Dose & Alert Escalation Sequence
